@@ -1,0 +1,5 @@
+*.sublime-*
+*.exe
+*.s
+*.o
+foo.ppm

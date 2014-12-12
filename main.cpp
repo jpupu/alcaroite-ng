@@ -87,7 +87,7 @@ bool Shape_intersect (Ray& ray)
 // }
 
 
-void basis (const vec3& normal, mat34& basis2canon, mat34& canon2basis)
+mat34 basis_from_normal (const vec3& normal)
 {
     vec3 tangent0;
     float ax = fabs(normal.x);
@@ -112,12 +112,9 @@ void basis (const vec3& normal, mat34& basis2canon, mat34& canon2basis)
     vec3 bitangent = cross(normal, tangent0);
     vec3 tangent = cross(bitangent, normal);
 
-    basis2canon = { tangent.x, bitangent.x, normal.x, 0,
-                    tangent.y, bitangent.y, normal.y, 0,
-                    tangent.z, bitangent.z, normal.z, 0 };
-    canon2basis = { tangent.x, tangent.y, tangent.z, 0, 
-                    bitangent.x, bitangent.y, bitangent.z, 0, 
-                    normal.x, normal.y, normal.z, 0 };
+    return { tangent.x, bitangent.x, normal.x, 0,
+             tangent.y, bitangent.y, normal.y, 0,
+             tangent.z, bitangent.z, normal.z, 0 };
 }
 
 #include <cstdlib>
@@ -146,10 +143,9 @@ float radiance (Ray& ray)
 {
     if (!Shape_intersect(ray)) return environment(ray.direction);
 
-    mat34 to_tangent, from_tangent;
-    basis(ray.normal, from_tangent, to_tangent);
+    mat34 from_tangent = basis_from_normal(ray.normal);
 
-    vec3 wo_t = mul_rotation(to_tangent, -ray.direction);
+    vec3 wo_t = mul_rotation_transpose(from_tangent, -ray.direction);
     // vec3 wi_t = vec3(0, 0, 1);
     // vec3 wi_t = vec3(-wo_t.x, -wo_t.y, wo_t.z);
     vec3 wi_t = sample_hemisphere(frand(), frand());

@@ -1,6 +1,147 @@
 #include "pupumath_plain.hpp"
+#include <memory>
 
 using namespace pupumath_plain;
+
+#include <cstdlib>
+#include <tuple>
+#define M_PI 3.141592
+float frand ()
+{
+    return static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+}
+
+struct Sampler
+{
+    int n;
+    std::unique_ptr<float[]> wavelen;
+    std::unique_ptr<vec3[]> lens;
+    std::unique_ptr<vec3[]> shading;
+
+    Sampler (int n);
+    void generate ();
+    void next ();
+};
+
+Sampler::Sampler (int n)
+    : n(n),
+    wavelen(new float[n]),
+    lens(new vec3[n]),
+    shading(new vec3[n])
+{ }
+
+void Sampler::generate ()
+{
+    {
+        const float step = 380.f / n;
+        for (int i = 0; i < n; i++) {
+            wavelen[i] = 420.f + (i + frand()) * step;
+        }
+    }
+
+    {
+        for (int i = 0; i < n; i++) {
+            lens[i] = vec3{ frand(), frand(), 0 };
+        }
+    }
+
+    {
+
+        const float step = 1.f / n;
+        for (int i = 0; i < n; i++) {
+            shading[i] = vec3{ (i + frand()) * step, (i + frand()) * step, 0 };
+            // shading[i] = vec3{ frand(), frand(), 0 };
+        }
+        // Shuffle u1 values -> latin hypercube.
+        for (int i = 0; i < n - 1; i++) {
+            int j = i + rand()%(n-i);
+            std::swap(shading[i].x, shading[j].x);
+        }
+    }
+}
+
+void Sampler::next ()
+{
+    {
+        // Shuffle.
+        for (int i = 0; i < n - 1; i++) {
+            int j = i + rand()%(n-i);
+            std::swap(wavelen[i], wavelen[j]);
+        }
+    }
+
+    {
+        // Shuffle.
+        for (int i = 0; i < n - 1; i++) {
+            int j = i + rand()%(n-i);
+            std::swap(lens[i], lens[j]);
+        }
+    }
+
+    {
+        // Shuffle samples.
+        for (int i = 0; i < n - 1; i++) {
+            int j = i + rand()%(n-i);
+            std::swap(shading[i], shading[j]);
+        }
+    }
+}
+
+
+// Fitting functions from http://psgraphics.blogspot.fi/2014/11/converting-spectra-to-xyzrgb-values.html
+// @article{Wyman2013xyz,
+//    author  = {Chris Wyman and Peter-Pike Sloan and Peter Shirley},
+//    title   = {Simple Analytic Approximations to the {CIE XYZ} Color Matching Functions},  
+//    year    = {2013},
+//    month   = {July},
+//    day     = {12},
+//    journal = {Journal of Computer Graphics Techniques (JCGT)},
+//    volume  = {2},
+//    number  = {2},
+//    pages   = {1--11},
+//    url     = {http://jcgt.org/published/0002/02/01/},
+//    issn    = {2331-7418}
+// }          
+
+// Inputs: wavelength in nanometers
+float xFit_1931(float wave) {
+    float t1 = (wave-442.0f) * ((wave<442.0f)?0.0624f:0.0374f);
+    float t2 = (wave-599.8f) * ((wave<599.8f)?0.0264f:0.0323f);
+    float t3 = (wave-501.1f) * ((wave<501.1f)?0.0490f:0.0382f);
+    return 0.362f * expf(-0.5f * t1 * t1) +
+           1.056f * expf(-0.5f * t2 * t2) -
+           0.065f * expf(-0.5f * t3 * t3);
+}
+float yFit_1931(float wave) {
+    float t1 = (wave-568.8f) * ((wave<568.8f)?0.0213f:0.0247f);
+    float t2 = (wave-530.9f) * ((wave<530.9f)?0.0613f:0.0322f);
+    return 0.821f * exp(-0.5f * t1 * t1) +
+           0.286f * expf(-0.5f * t2 * t2);
+}
+float zFit_1931(float wave) {
+    float t1 = (wave-437.0f) * ((wave<437.0f)?0.0845f:0.0278f);
+    float t2 = (wave-459.0f) * ((wave<459.0f)?0.0385f:0.0725f);
+    return 1.217f * exp(-0.5f * t1 * t1) +
+           0.681f * expf(-0.5f * t2 * t2);
+}
+
+vec3 spectrum_sample_to_xyz (float wavelength, float amplitude)
+{
+    return vec3{ amplitude * xFit_1931(wavelength),
+                 amplitude * yFit_1931(wavelength),
+                 amplitude * zFit_1931(wavelength) };
+}
+
+vec3 xyz_to_linear_rgb (const vec3& xyz)
+{
+    static constexpr mat34 M = {
+        3.2406, -1.5372, -0.4986, 0,
+        -0.9689, 1.8758, 0.0415,  0,
+        0.0557, -0.2040, 1.0570,  0,
+    };
+    return mul_rotation(M, xyz);
+}
+
 
 struct Ray
 {
@@ -117,13 +258,6 @@ mat34 basis_from_normal (const vec3& normal)
              tangent.z, bitangent.z, normal.z, 0 };
 }
 
-#include <cstdlib>
-#include <tuple>
-#define M_PI 3.141592
-float frand ()
-{
-    return static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-}
 
 // Sampling formulas from http://web.cs.wpi.edu/~emmanuel/courses/cs563/S07/talks/emmanuel_agu_mc_wk10_p2.pdf
 
@@ -158,7 +292,7 @@ float environment (const vec3& v)
     return std::max(0.0f, dot(v, vec3(0,1,0)));
 }
 
-float radiance (Ray& ray)
+float radiance (Ray& ray, Sampler& sampler, int sample_index)
 {
     if (!Shape_intersect(ray)) return environment(ray.direction);
 
@@ -167,7 +301,8 @@ float radiance (Ray& ray)
     vec3 wo_t = mul_rotation_transpose(from_tangent, -ray.direction);
     // vec3 wi_t = vec3(0, 0, 1);
     // vec3 wi_t = vec3(-wo_t.x, -wo_t.y, wo_t.z);
-    vec3 wi_t = sample_hemisphere(frand(), frand());
+    vec3 sample = sampler.shading[sample_index];
+    vec3 wi_t = sample_hemisphere(sample[0], sample[1]);
     vec3 wi_w = mul_rotation(from_tangent, wi_t);
 
     return environment(wi_w);
@@ -240,15 +375,14 @@ out & entering
 
 struct Pixel
 {
-    float value;
+    vec3 value;
     float weight;
 
-    Pixel () : value(0.0f), weight(0.0001f) { }
+    Pixel () : value(vec3(0.0f)), weight(0.0001f) { }
 
-    float normalized () const  { return value / weight; }
+    vec3 normalized () const  { return value / weight; }
 };
 
-#include <memory>
 
 class Framebuffer
 {
@@ -260,9 +394,9 @@ public:
     : xres(xres), yres(yres), pixels(new Pixel[xres*yres])
     { }
 
-    void add_sample (float x, float y, float v)
+    void add_sample (float x, float y, const vec3& v)
     {
-        pixels[int(x)+int(y)*xres].value += v;
+        pixels[int(x)+int(y)*xres].value = pixels[int(x)+int(y)*xres].value + v;
         pixels[int(x)+int(y)*xres].weight += 1;
     }
 
@@ -271,11 +405,11 @@ public:
         FILE* fp = fopen("foo.ppm", "wb");
         fprintf(fp, "P6\n%d %d\n255\n", xres, yres);
         for (int i = 0; i < xres*yres; i++) {
-            float c = pixels[i].normalized();
-            c = std::min(1.0f, std::max(0.0f, c));
-            fputc(int(255*c), fp);
-            fputc(int(255*c), fp);
-            fputc(int(255*c), fp);
+            vec3 c = pixels[i].normalized();
+            for (int k = 0; k < 3; k++) {
+                float ck = std::min(1.0f, std::max(0.0f, c[k]));
+                fputc(int(255*ck), fp);
+            }
         }
         fclose(fp);
     }
@@ -283,25 +417,40 @@ public:
 };
 
 
-
+#include <chrono>
 int main ()
 {
     constexpr int W = 100;
     constexpr int H = 100;
-    constexpr int S = 10;
+    constexpr int S = 1000;
+    printf("Rendering %dx%d with %d samples/pixel\n", W, H, S);
     Framebuffer framebuffer(W, H);
     vec3 origin = vec3(0,-0,2);
+    Sampler sampler = Sampler(S);
+    sampler.generate();
+    auto start = std::chrono::system_clock::now();
     for (int y = 0; y < H; y++) {
         for (int x = 0; x < W; x++) {
+    // sampler.generate();
+            sampler.next();
             for (int s = 0; s < S; s++) {
-                vec3 direction = normalize(vec3(float(x)/W * 2 - 1, -(float(y)/H * 2 - 1), -1));
+                // float wavelen = frand() * 380 + 420;
+                float wavelen = sampler.wavelen[s];//frand() * 380 + 420;
+                vec3 direction = normalize( vec3(float(x + sampler.lens[s].x)/W * 2 - 1,
+                                                 -(float(y + sampler.lens[s].y)/H * 2 - 1),
+                                                 -1) );
+
                 Ray ray = {origin, direction, 1000.0};
-                float L = radiance(ray);
-                framebuffer.add_sample(x, y, L);
+                float L = radiance(ray, sampler, s)*10;
+                vec3 rgb = xyz_to_linear_rgb(spectrum_sample_to_xyz(wavelen, L));
+                framebuffer.add_sample(x, y, rgb);
             }
             // printf("%c", '0'+int(9*L));
         }
         // printf("\n");
     }
+    auto end = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    printf("Rendered in %.1f seconds\n", elapsed.count());
     framebuffer.save_ppm();
 }

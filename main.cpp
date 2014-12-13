@@ -238,26 +238,70 @@ out & entering
 */  
 
 
+struct Pixel
+{
+    float value;
+    float weight;
+
+    Pixel () : value(0.0f), weight(0.0001f) { }
+
+    float normalized () const  { return value / weight; }
+};
+
+#include <memory>
+
+class Framebuffer
+{
+public:
+    int xres, yres;
+    std::unique_ptr<Pixel[]> pixels;
+
+    Framebuffer (int xres, int yres)
+    : xres(xres), yres(yres), pixels(new Pixel[xres*yres])
+    { }
+
+    void add_sample (float x, float y, float v)
+    {
+        pixels[int(x)+int(y)*xres].value += v;
+        pixels[int(x)+int(y)*xres].weight += 1;
+    }
+
+    void save_ppm ()
+    {
+        FILE* fp = fopen("foo.ppm", "wb");
+        fprintf(fp, "P6\n%d %d\n255\n", xres, yres);
+        for (int i = 0; i < xres*yres; i++) {
+            float c = pixels[i].normalized();
+            c = std::min(1.0f, std::max(0.0f, c));
+            fputc(int(255*c), fp);
+            fputc(int(255*c), fp);
+            fputc(int(255*c), fp);
+        }
+        fclose(fp);
+    }
+
+};
+
 
 
 int main ()
 {
     constexpr int W = 100;
     constexpr int H = 100;
+    constexpr int S = 10;
+    Framebuffer framebuffer(W, H);
     vec3 origin = vec3(0,-0,2);
-    FILE* fp = fopen("foo.ppm", "wb");
-    fprintf(fp, "P6\n%d %d\n255\n", W, H);
     for (int y = 0; y < H; y++) {
         for (int x = 0; x < W; x++) {
-            vec3 direction = normalize(vec3(float(x)/W * 2 - 1, -(float(y)/H * 2 - 1), -1));
-            Ray ray = {origin, direction, 1000.0};
-            float L = radiance(ray);
+            for (int s = 0; s < S; s++) {
+                vec3 direction = normalize(vec3(float(x)/W * 2 - 1, -(float(y)/H * 2 - 1), -1));
+                Ray ray = {origin, direction, 1000.0};
+                float L = radiance(ray);
+                framebuffer.add_sample(x, y, L);
+            }
             // printf("%c", '0'+int(9*L));
-            fputc(int(255*L), fp);
-            fputc(int(255*L), fp);
-            fputc(int(255*L), fp);
         }
         // printf("\n");
     }
-    fclose(fp);
+    framebuffer.save_ppm();
 }

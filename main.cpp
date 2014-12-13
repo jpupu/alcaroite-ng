@@ -118,18 +118,37 @@ mat34 basis_from_normal (const vec3& normal)
 }
 
 #include <cstdlib>
+#include <tuple>
 #define M_PI 3.141592
 float frand ()
 {
     return static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
 }
 
+// Sampling formulas from http://web.cs.wpi.edu/~emmanuel/courses/cs563/S07/talks/emmanuel_agu_mc_wk10_p2.pdf
+
+std::tuple<float, float> sample_disk (float u1, float u2)
+{
+    float theta = 2 * M_PI * u1;
+    float r = sqrtf(u2);
+    return std::make_tuple(cos(theta) * r, sin(theta) * r);
+}
+
 vec3 sample_hemisphere (float u1, float u2)
 {
-    float theta = u1 * M_PI * 2;
-    float phi = u2;
-    return vec3(sin(theta)*phi, cos(theta)*phi, sqrtf(1+phi*phi));
+    float r = sqrtf(1.0f - u1*u1);
+    float phi = 2 * M_PI * u2;
+    return vec3(cos(phi) * r, sin(phi) * r, u1);
 }
+
+vec3 sample_hemisphere_cosine (float u1, float u2)
+{
+    float x, y;
+    std::tie(x, y) = sample_disk(u1, u2);
+    float z = sqrtf( std::max(0.0f, 1.0f - x*x - y*y) );
+    return vec3{x,y,z};
+}
+
 
 
 #include <algorithm>

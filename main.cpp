@@ -234,22 +234,28 @@ mat34 basis_from_normal (const vec3& normal)
     float ax = fabs(normal.x);
     float ay = fabs(normal.y);
     float az = fabs(normal.z);
-    if (ax > ay) {
-        if (ax > az) {
-            tangent0 = vec3(0,0,-1);
-        }
-        else {
-            tangent0 = vec3(1,0,0);
-        }
+    if (ax > ay && ax > az) {
+        tangent0 = vec3(0,0,-1);
     }
     else {
-        if (ay > az) {
-            tangent0 = vec3(1,0,0);
-        }
-        else {
-            tangent0 = vec3(1,0,0);
-        }
+        tangent0 = vec3(1,0,0);
     }
+    // if (ax > ay) {
+    //     if (ax > az) {
+    //         tangent0 = vec3(0,0,-1);
+    //     }
+    //     else {
+    //         tangent0 = vec3(1,0,0);
+    //     }
+    // }
+    // else {
+    //     if (ay > az) {
+    //         tangent0 = vec3(1,0,0);
+    //     }
+    //     else {
+    //         tangent0 = vec3(1,0,0);
+    //     }
+    // }
     vec3 bitangent = cross(normal, tangent0);
     vec3 tangent = cross(bitangent, normal);
 

@@ -413,7 +413,17 @@ public:
         for (int i = 0; i < xres*yres; i++) {
             vec3 c = pixels[i].normalized();
             for (int k = 0; k < 3; k++) {
-                float ck = std::min(1.0f, std::max(0.0f, c[k]));
+                float ck = c[k];
+                // ck = ck / (1+ck);
+                // from http://en.wikipedia.org/wiki/SRGB
+                if (ck <= 0.0031308) {
+                    ck *= 12.92;
+                }
+                else {
+                    float a = 0.055;
+                    ck = (1 + a) * powf(ck, 1/2.4) - a; // is 2.4 right?
+                }
+                ck = std::min(1.0f, std::max(0.0f, ck));
                 fputc(int(255*ck), fp);
             }
         }
@@ -447,7 +457,7 @@ int main ()
                                                  -1) );
 
                 Ray ray = {origin, direction, 1000.0};
-                float L = radiance(ray, sampler, s)*10;
+                float L = radiance(ray, sampler, s);
                 vec3 rgb = xyz_to_linear_rgb(spectrum_sample_to_xyz(wavelen, L));
                 framebuffer.add_sample(x, y, rgb);
             }

@@ -289,13 +289,35 @@ vec3 sample_hemisphere_cosine (float u1, float u2)
     return vec3{x,y,z};
 }
 
-
+float cos_theta (const vec3& v) { return v.z; }
 
 #include <algorithm>
 #include <cstdio>
 float environment (const vec3& v)
 {
     return std::max(0.0f, dot(v, vec3(0,1,0)));
+    // return 1.0;
+}
+
+
+float brdf_lambertian (const vec3& wo, vec3& wi, float& pdf, float u1, float u2)
+{
+    // // Cosine-weigted sampling.
+    // wi = sample_hemisphere_cosine(u1, u2);
+    // pdf = cos_theta(wi) / M_PI;
+
+    // Uniform sampling.
+    wi = sample_hemisphere(u1, u2);
+    pdf = 1 / (2*M_PI);
+
+    return 1.0 / M_PI;;
+}
+
+float brdf_perfect_specular (const vec3& wo, vec3& wi, float& pdf, float u1, float u2)
+{
+    wi = vec3{-wo.x, -wo.y, wo.z};
+    pdf = 1.0;
+    return 1.0 / cos_theta(wi);
 }
 
 float radiance (Ray& ray, Sampler& sampler, int sample_index)
@@ -308,10 +330,12 @@ float radiance (Ray& ray, Sampler& sampler, int sample_index)
     // vec3 wi_t = vec3(0, 0, 1);
     // vec3 wi_t = vec3(-wo_t.x, -wo_t.y, wo_t.z);
     vec3 sample = sampler.shading[sample_index];
-    vec3 wi_t = sample_hemisphere(sample[0], sample[1]);
+    vec3 wi_t;
+    float pdf;
+    float fr = brdf_lambertian(wo_t, wi_t, pdf, sample[0], sample[1]);
     vec3 wi_w = mul_rotation(from_tangent, wi_t);
 
-    return environment(wi_w);
+    return fr * environment(wi_w) * cos_theta(wi_t) / pdf;
 
     // brdf = ray.material.brdf(ray.position);
     // wo_tangent = transform(-ray.direction);

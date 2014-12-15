@@ -1,0 +1,33 @@
+<!doctype html>
+<html><head>
+<script src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=AM_HTMLorMML"></script>
+</head>
+Integrating in spherical coordinates, the differential element is `sin theta d theta d phi`.
+
+<p>
+E.g. the area of hemisphere:
+`int_0^(pi/2) int_0^(2pi) |sin theta|  d theta d phi = 2pi`
+</p>
+
+<p>
+This explains why...<br>
+<strong>Theorem:</strong>The lambertian BRDF with unit reflectance is `1/pi`.
+</p>
+
+<p>
+<strong>Proof:</strong> Assume lambertian surface with unit reflectance lit uniformly from all directions. Hemispherical-directional reflectance `rho_hd` is the same for all directions. Because unit reflectance, it must be equal to 1.
+</p>
+
+<p>
+`rho_(hd) (omega_o) = int_(fr "H"^2) f_r(p,omega_o,omega_i)|cos theta_i| d omega_i = 1` <br>
+`= int_o^(pi/2) int_0^(2pi) f_r(p,omega_o,omega_i)|cos theta_i sin theta_i| d theta_i d phi_i ` <br>
+Since `f_r` is constant move it outside... <br>
+`= f_r(p,omega_o,omega_i) int_o^(pi/2) int_0^(2pi) |cos theta_i sin theta_i| d theta_i d phi_i ` <br>
+The integeral resolves to `pi` <a href="http://www.wolframalpha.com/input/?i=integrate+|cos+theta+sin+theta|+dtheta+dphi%2C+theta%3D0..2pi%2C+phi%3D0..pi%2F2...">(Wolfram Alpha)</a><br>
+`= f_r(p,omega_o,omega_i) pi = 1` <br>
+`&lt;=&gt; f_r(p,omega_o,omega_i) = 1/pi`
+</p>
+
+<body>
+</body>
+</html>

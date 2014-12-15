@@ -142,6 +142,46 @@ vec3 xyz_to_linear_rgb (const vec3& xyz)
     return mul_rotation(M, xyz);
 }
 
+vec3 linear_rgb_to_xyz (const vec3& rgb)
+{
+    static constexpr mat34 M = {
+        0.4124, 0.3576, 0.1805, 0,
+        0.2126, 0.7152, 0.0722,  0,
+        0.0193, 0.1192, 0.9505,  0,
+    };
+    return mul_rotation(M, rgb);
+}
+
+vec3 srgb_to_xyz (vec3 rgb)
+{
+    for (int k = 0; k < 3; k++) {
+        rgb[k] = powf(rgb[k], 2.4);
+    }
+    return linear_rgb_to_xyz(rgb);
+}
+
+struct SolidXyzCurveSpectrum
+{
+    vec3 xyz;
+    float sample (float wavelen)
+    {
+        return ( xyz.x * xFit_1931(wavelen) +
+                 xyz.y * yFit_1931(wavelen) +
+                 xyz.z * zFit_1931(wavelen) );
+    }
+};
+
+#include <vector>
+struct SolidSampledSpectrum
+{
+    float min, max;
+    std::vector<float> samples;
+    float sample (float wavelen)
+    {
+        if (wavelen < min || wavelen >= max) return 0.0f;
+        return samples[int(samples.size() * (wavelen - min) / (max - min))];
+    }
+};
 
 struct Ray
 {
@@ -320,7 +360,7 @@ float brdf_perfect_specular (const vec3& wo, vec3& wi, float& pdf, float u1, flo
     return 1.0 / cos_theta(wi);
 }
 
-float radiance (Ray& ray, Sampler& sampler, int sample_index)
+float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index)
 {
     if (!Shape_intersect(ray)) return environment(ray.direction);
 
@@ -335,7 +375,10 @@ float radiance (Ray& ray, Sampler& sampler, int sample_index)
     float fr = brdf_lambertian(wo_t, wi_t, pdf, sample[0], sample[1]);
     vec3 wi_w = mul_rotation(from_tangent, wi_t);
 
-    return fr * environment(wi_w) * cos_theta(wi_t) / pdf;
+    // SolidXyzCurveSpectrum R = { srgb_to_xyz(vec3{0.0, 1.0, 0.0}) };
+    SolidSampledSpectrum R = { 400, 700, {0,1,1,0} };
+
+    return R.sample(wavelen) * fr * environment(wi_w) * cos_theta(wi_t) / pdf;
 
     // brdf = ray.material.brdf(ray.position);
     // wo_tangent = transform(-ray.direction);
@@ -462,7 +505,7 @@ int main ()
 {
     constexpr int W = 100;
     constexpr int H = 100;
-    constexpr int S = 1000;
+    constexpr int S = 100;
     printf("Rendering %dx%d with %d samples/pixel\n", W, H, S);
     Framebuffer framebuffer(W, H);
     vec3 origin = vec3(0,-0,2);
@@ -481,7 +524,7 @@ int main ()
                                                  -1) );
 
                 Ray ray = {origin, direction, 1000.0};
-                float L = radiance(ray, sampler, s);
+                float L = radiance(ray, wavelen, sampler, s);
                 vec3 rgb = xyz_to_linear_rgb(spectrum_sample_to_xyz(wavelen, L));
                 framebuffer.add_sample(x, y, rgb);
             }

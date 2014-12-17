@@ -5,6 +5,7 @@ using namespace pupumath_plain;
 
 #include <cstdlib>
 #include <tuple>
+#include <vector>
 #define M_PI 3.141592
 float frand ()
 {
@@ -160,18 +161,68 @@ vec3 srgb_to_xyz (vec3 rgb)
     return linear_rgb_to_xyz(rgb);
 }
 
-struct SolidXyzCurveSpectrum
+std::vector<float> linear_rgb_to_spectrum (const vec3& rgb)
 {
-    vec3 xyz;
-    float sample (float wavelen)
-    {
-        return ( xyz.x * xFit_1931(wavelen) +
-                 xyz.y * yFit_1931(wavelen) +
-                 xyz.z * zFit_1931(wavelen) );
-    }
-};
+    // http://www.cs.utah.edu/~bes/papers/color/
+    // Smits, Brian: An RGB to Spectrum Conversion for Reflectances
+    
+    constexpr int N = 10;
+    static float white_spectrum[N] = {1,1,.9999,.9993,.9992,.9998,1,1,1,1};
+    static float yellow_spectrum[N] = {.9710,.9426,1.0007,1.0007,1.0007,1.0007,0.1564,0,0,0};
+    static float cyan_spectrum[N] = {1,1,.9685,.2229,0,0.0458,0.8369,1,1,0.9959};
+    static float magenta_spectrum[N] = {0.0001,0,0.1088,0.6651,1,1,0.9996,0.9586,0.9685,0.9840};
+    static float red_spectrum[N] = {0.1012,0.0515,0,0,0,0,0.8325,1.0149,1.0149,1.0149};
+    static float green_spectrum[N] = {0,0,0.0273,0.7937,1,0.9418,0.1719,0,0,0.0025};
+    static float blue_spectrum[N] = {1,1,0.8916,0.3323,0,0,0.0003,0.0369,0.0483,0.0496};
 
-#include <vector>
+    std::vector<float> spectrum(N, 0.0f);
+
+    float r = rgb[0];
+    float g = rgb[1];
+    float b = rgb[2];
+
+    auto add = [N,&spectrum](float scl, float* src) {
+        for (int i = 0; i < N; i++) { spectrum[i] += scl * src[i]; }
+    };
+
+    if (r < g && r < b) {
+        add(r, white_spectrum);
+        if (g < b) {
+            add(g-r, cyan_spectrum);
+            add(b-g, blue_spectrum);
+        }
+        else {
+            add(b-r, cyan_spectrum);
+            add(g-b, green_spectrum);
+        }
+    }
+    else if (g < r && g < b) {
+        add(g, white_spectrum);
+        if (r < b) {
+            add(r-g, magenta_spectrum);
+            add(b-r, blue_spectrum);
+        }
+        else {
+            add(b-g, magenta_spectrum);
+            add(r-b, red_spectrum);
+        }
+    }
+    else { // (b < r && b < g)
+        add(b, white_spectrum);
+        if (r < g) {
+            add(r-b, yellow_spectrum);
+            add(g-r, green_spectrum);
+        }
+        else {
+            add(g-b, yellow_spectrum);
+            add(r-g, red_spectrum);
+        }
+    }
+
+    return spectrum;
+}
+
+
 struct SolidSampledSpectrum
 {
     float min, max;
@@ -181,6 +232,12 @@ struct SolidSampledSpectrum
         if (wavelen < min || wavelen >= max) return 0.0f;
         return samples[int(samples.size() * (wavelen - min) / (max - min))];
     }
+
+    SolidSampledSpectrum () {}
+    SolidSampledSpectrum (const vec3& linear_rgb)
+        : min(380), max(720),
+        samples( linear_rgb_to_spectrum(linear_rgb) )
+        { }
 };
 
 struct Ray
@@ -376,7 +433,8 @@ float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index)
     vec3 wi_w = mul_rotation(from_tangent, wi_t);
 
     // SolidXyzCurveSpectrum R = { srgb_to_xyz(vec3{0.0, 1.0, 0.0}) };
-    SolidSampledSpectrum R = { 400, 700, {0,1,1,0} };
+    // SolidSampledSpectrum R = { 400, 700, {0,1,1,0} };
+    SolidSampledSpectrum R(vec3(0,1,0));
 
     return R.sample(wavelen) * fr * environment(wi_w) * cos_theta(wi_t) / pdf;
 

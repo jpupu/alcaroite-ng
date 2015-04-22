@@ -6,7 +6,11 @@ using namespace pupumath_plain;
 #include <cstdlib>
 #include <tuple>
 #include <vector>
+
+#ifndef M_PI
 #define M_PI 3.141592
+#endif
+
 float frand ()
 {
     return static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
@@ -263,35 +267,60 @@ struct Ray
 };
 
 
+class Shape {
+public:
+    virtual bool intersect (Ray& ray) const = 0;
+};
 
+class Sphere : public Shape {
+public:
+    bool intersect (Ray& ray) const
+    {
+        float b = 2 * dot(ray.origin, ray.direction);
+        float c = dot(ray.origin, ray.origin) - 1.0;
+        float d = b*b - 4*c;
 
-bool Shape_intersect (Ray& ray)
-{
-    float b = 2 * dot(ray.origin, ray.direction);
-    float c = dot(ray.origin, ray.origin) - 1.0;
-    float d = b*b - 4*c;
+        if (d < 0) {
+            return false;
+        }
 
-    if (d < 0) {
-        return false;
+        // float t1 = (-b - sqrtf(d)) / 2.0;
+        // float t2 = (-b + sqrtf(d)) / 2.0;
+        float t1 = (b + sqrtf(d)) / -2.0;
+        float t2 = (b - sqrtf(d)) / -2.0;
+
+        float t = t1;
+        if (t > ray.tmax) return false;
+        if (t < 0.0f) t = t2;
+        if (t < 0.0f) return false;
+        if (t > ray.tmax) return false;
+
+        ray.tmax = t;
+        ray.position = ray.origin + ray.direction * t;
+        ray.normal = normalize(ray.position);
+
+        return true;
     }
+};
 
-    // float t1 = (-b - sqrtf(d)) / 2.0;
-    // float t2 = (-b + sqrtf(d)) / 2.0;
-    float t1 = (b + sqrtf(d)) / -2.0;
-    float t2 = (b - sqrtf(d)) / -2.0;
+class Plane : public Shape {
+public:
+    bool intersect (Ray& ray) const
+    {
+        if (ray.direction.y == 0) return false;
 
-    float t = t1;
-    if (t > ray.tmax) return false;
-    if (t < 0.0f) t = t2;
-    if (t < 0.0f) return false;
-    if (t > ray.tmax) return false;
+        float t = -ray.origin.y / ray.direction.y;
 
-    ray.tmax = t;
-    ray.position = ray.origin + ray.direction * t;
-    ray.normal = normalize(ray.position);
+        if (t < 0.0f) return false;
+        if (t > ray.tmax) return false; 
 
-    return true;
-}
+        ray.tmax = t;
+        ray.position = ray.origin + ray.direction * t;
+        ray.normal = vec3(0,1,0);
+
+        return true;
+    }
+};
 
 
 // bool Shape::intersect (Ray& ray, bool is_originator, bool inside_originator)
@@ -417,9 +446,14 @@ float brdf_perfect_specular (const vec3& wo, vec3& wi, float& pdf, float u1, flo
     return 1.0 / cos_theta(wi);
 }
 
-float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index)
+float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index, int nested=0)
 {
-    if (!Shape_intersect(ray)) return environment(ray.direction);
+    if (nested>10) return 0.0f;
+    Sphere sh1 = Sphere();
+    Plane sh2 = Plane();
+    bool hit = sh1.intersect(ray) || sh2.intersect(ray);
+    // bool hit = sh2.intersect(ray);
+    if (!hit) return environment(ray.direction);
 
     mat34 from_tangent = basis_from_normal(ray.normal);
 
@@ -429,14 +463,18 @@ float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index)
     vec3 sample = sampler.shading[sample_index];
     vec3 wi_t;
     float pdf;
-    float fr = brdf_lambertian(wo_t, wi_t, pdf, sample[0], sample[1]);
+    // float fr = brdf_lambertian(wo_t, wi_t, pdf, sample[0], sample[1]);
+    float fr = brdf_lambertian(wo_t, wi_t, pdf, frand(), frand());
     vec3 wi_w = mul_rotation(from_tangent, wi_t);
 
     // SolidXyzCurveSpectrum R = { srgb_to_xyz(vec3{0.0, 1.0, 0.0}) };
     // SolidSampledSpectrum R = { 400, 700, {0,1,1,0} };
-    SolidSampledSpectrum R(vec3(0,1,0));
+    SolidSampledSpectrum R(vec3(1,1,1));
 
-    return R.sample(wavelen) * fr * environment(wi_w) * cos_theta(wi_t) / pdf;
+    Ray next_ray = {ray.position, wi_w, 1000.0};
+    float L = radiance(next_ray, wavelen, sampler, sample_index, nested+1);
+
+    return R.sample(wavelen) * fr * L * cos_theta(wi_t) / pdf;
 
     // brdf = ray.material.brdf(ray.position);
     // wo_tangent = transform(-ray.direction);
@@ -563,10 +601,10 @@ int main ()
 {
     constexpr int W = 100;
     constexpr int H = 100;
-    constexpr int S = 100;
+    constexpr int S = 1000;
     printf("Rendering %dx%d with %d samples/pixel\n", W, H, S);
     Framebuffer framebuffer(W, H);
-    vec3 origin = vec3(0,-0,2);
+    vec3 origin = vec3(0,.3,2);
     Sampler sampler = Sampler(S);
     sampler.generate();
     auto start = std::chrono::system_clock::now();

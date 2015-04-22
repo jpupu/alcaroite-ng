@@ -168,12 +168,12 @@ std::vector<float> linear_rgb_to_spectrum (const vec3& rgb)
     
     constexpr int N = 10;
     static float white_spectrum[N] = {1,1,.9999,.9993,.9992,.9998,1,1,1,1};
-    static float yellow_spectrum[N] = {.9710,.9426,1.0007,1.0007,1.0007,1.0007,0.1564,0,0,0};
-    static float cyan_spectrum[N] = {1,1,.9685,.2229,0,0.0458,0.8369,1,1,0.9959};
-    static float magenta_spectrum[N] = {0.0001,0,0.1088,0.6651,1,1,0.9996,0.9586,0.9685,0.9840};
     static float red_spectrum[N] = {0.1012,0.0515,0,0,0,0,0.8325,1.0149,1.0149,1.0149};
+    static float yellow_spectrum[N] = {0.0001,0,0.1088,0.6651,1,1,0.9996,0.9586,0.9685,0.9840};
     static float green_spectrum[N] = {0,0,0.0273,0.7937,1,0.9418,0.1719,0,0,0.0025};
+    static float cyan_spectrum[N] = {.9710,.9426,1.0007,1.0007,1.0007,1.0007,0.1564,0,0,0};
     static float blue_spectrum[N] = {1,1,0.8916,0.3323,0,0,0.0003,0.0369,0.0483,0.0496};
+    static float magenta_spectrum[N] = {1,1,.9685,.2229,0,0.0458,0.8369,1,1,0.9959};
 
     std::vector<float> spectrum(N, 0.0f);
 

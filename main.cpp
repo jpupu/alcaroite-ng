@@ -244,6 +244,8 @@ struct SolidSampledSpectrum
         { }
 };
 
+class GeometricObject;
+
 struct Ray
 {
     const vec3 origin;
@@ -251,7 +253,7 @@ struct Ray
 
     // constraints:
     float tmax;
-    // Object* originator; // the object that the ray originates from
+    const GeometricObject* originator; // the object that the ray originates from
     // int originator_subid;
 
     // intersection:
@@ -259,7 +261,7 @@ struct Ray
     vec3 normal;
     // vec3 texcoord;
     // Material* material;
-    // Object* hit_object;
+    const GeometricObject* hit_object;
     // int hit_subid;
 
     // context: [wrong place?]
@@ -269,12 +271,12 @@ struct Ray
 
 class Shape {
 public:
-    virtual bool intersect (Ray& ray) const = 0;
+    virtual bool intersect (Ray& ray, bool is_originator, bool inside_originator) const = 0;
 };
 
 class Sphere : public Shape {
 public:
-    bool intersect (Ray& ray) const
+    bool intersect (Ray& ray, bool is_originator, bool inside_originator) const
     {
         float b = 2 * dot(ray.origin, ray.direction);
         float c = dot(ray.origin, ray.origin) - 1.0;
@@ -289,9 +291,17 @@ public:
         float t1 = (b + sqrtf(d)) / -2.0;
         float t2 = (b - sqrtf(d)) / -2.0;
 
-        float t = t1;
-        if (t > ray.tmax) return false;
-        if (t < 0.0f) t = t2;
+        float t;
+        if (is_originator) {
+            t = inside_originator ? t2 : t1;
+        }
+        else {
+            t = (t1 < 0.0f) ? t2 : t1;
+        }
+
+        // float t = t1;
+        // if (t > ray.tmax) return false;
+        // if (t < 0.0f) t = t2;
         if (t < 0.0f) return false;
         if (t > ray.tmax) return false;
 
@@ -305,9 +315,14 @@ public:
 
 class Plane : public Shape {
 public:
-    bool intersect (Ray& ray) const
+    bool intersect (Ray& ray, bool is_originator, bool inside_originator) const
     {
         if (ray.direction.y == 0) return false;
+
+        if (is_originator) {
+            if (inside_originator && ray.direction.y < 0) return false;
+            if (!inside_originator && ray.direction.y > 0) return false;
+        }
 
         float t = -ray.origin.y / ray.direction.y;
 
@@ -320,6 +335,12 @@ public:
 
         return true;
     }
+};
+
+
+class GeometricObject {
+public:
+    std::shared_ptr<Shape> shape;
 };
 
 
@@ -446,12 +467,24 @@ float brdf_perfect_specular (const vec3& wo, vec3& wi, float& pdf, float u1, flo
     return 1.0 / cos_theta(wi);
 }
 
+std::vector<GeometricObject> objects = {
+    { std::make_shared<Sphere>() },
+    { std::make_shared<Plane>() },
+};
+
 float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index, int nested=0)
 {
     if (nested>10) return 0.0f;
-    Sphere sh1 = Sphere();
-    Plane sh2 = Plane();
-    bool hit = sh1.intersect(ray) || sh2.intersect(ray);
+    // Sphere sh1 = Sphere();
+    // Plane sh2 = Plane();
+    bool hit = false;
+    for (const auto& o : objects) {
+        if (o.shape->intersect(ray, ray.originator==&o, false)) {
+            ray.hit_object = &o;
+            hit = true;
+        }
+    }
+    // bool hit = o1.shape->intersect(ray, ray.originator==o1, false) || o2.shape->intersect(ray, ray.originator==o2, false);
     // bool hit = sh2.intersect(ray);
     if (!hit) return environment(ray.direction);
 
@@ -471,7 +504,7 @@ float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index, int
     // SolidSampledSpectrum R = { 400, 700, {0,1,1,0} };
     SolidSampledSpectrum R(vec3(1,1,1));
 
-    Ray next_ray = {ray.position, wi_w, 1000.0};
+    Ray next_ray = {ray.position, wi_w, 1000.0, ray.hit_object};
     float L = radiance(next_ray, wavelen, sampler, sample_index, nested+1);
 
     return R.sample(wavelen) * fr * L * cos_theta(wi_t) / pdf;
@@ -619,7 +652,7 @@ int main ()
                                                  -(float(y + sampler.lens[s].y)/H * 2 - 1),
                                                  -1) );
 
-                Ray ray = {origin, direction, 1000.0};
+                Ray ray = {origin, direction, 1000.0, nullptr};
                 float L = radiance(ray, wavelen, sampler, s);
                 vec3 rgb = xyz_to_linear_rgb(spectrum_sample_to_xyz(wavelen, L));
                 framebuffer.add_sample(x, y, rgb);

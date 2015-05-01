@@ -118,6 +118,16 @@ vec3 mul_rotation_transpose (const mat34& m, const vec3& v)
                  m[2]*v[0] + m[6]*v[1] + m[10]*v[2] };
 }
 
+inline
+mat34 transpose_rotation (const mat34& a)
+{
+    return mat34{{
+        a[0], a[4], a[8], 0,
+        a[1], a[5], a[9], 0,
+        a[2], a[6], a[10], 0,
+    }};
+}
+
 // 0 1 2  3      0 1 2  3 
 // 4 5 6  7   x  4 5 6  7
 // 8 9 10 11     8 9 10 11
@@ -126,7 +136,7 @@ vec3 mul_rotation_transpose (const mat34& m, const vec3& v)
 inline
 mat34 mul (const mat34& a, const mat34& b)
 {
-    return mat34{
+    return mat34{{
         a[0]*b[0] + a[1]*b[4] + a[2]*b[8],
         a[0]*b[1] + a[1]*b[5] + a[2]*b[9],
         a[0]*b[2] + a[1]*b[6] + a[2]*b[10],
@@ -141,13 +151,60 @@ mat34 mul (const mat34& a, const mat34& b)
         a[8]*b[1] + a[9]*b[5] + a[10]*b[9],
         a[8]*b[2] + a[9]*b[6] + a[10]*b[10],
         a[8]*b[3] + a[9]*b[7] + a[10]*b[11] + a[11],
-     };
+     }};
 }
 
 inline
 mat34 operator* (const mat34& a, const mat34& b)
 {
     return mul(a, b);
+}
+
+inline
+mat34 mul (const mat34& a, float b)
+{
+    mat34 res;
+    for (int i = 0; i < 12; i++) res[i] = a[i] * b;
+    return res;
+}
+
+inline
+mat34 operator* (const mat34& a, float b)
+{
+    return mul(a, b);
+}
+
+inline
+mat34 inverse_rotation (const mat34& a)
+{
+    mat34 minors = {{
+        a[5]*a[10] - a[6]*a[9],
+        a[4]*a[10] - a[6]*a[8],
+        a[4]*a[9]  - a[5]*a[8],
+        0,
+
+        a[1]*a[10] - a[2]*a[9],
+        a[0]*a[10] - a[2]*a[8],
+        a[0]*a[9]  - a[1]*a[8],
+        0,
+
+        a[1]*a[6]  - a[2]*a[5],
+        a[0]*a[6]  - a[2]*a[4],
+        a[0]*a[5]  - a[1]*a[4],
+        0,
+    }};
+
+    mat34 cofactors = {{
+         minors[0], -minors[1],  minors[2], 0,
+        -minors[4],  minors[5], -minors[6], 0,
+         minors[8], -minors[9],  minors[10], 0,  
+    }};
+
+    mat34 adjugate = transpose_rotation(cofactors);
+
+    float det = a[0]*minors[0] - a[1]*minors[1] + a[2]*minors[2];
+
+    return adjugate * (1/det);
 }
 
 } // namespace pupumath_plain

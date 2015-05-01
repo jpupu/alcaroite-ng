@@ -16,6 +16,76 @@ float frand ()
     return static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
 }
 
+
+
+mat34 basis_from_normal (const vec3& normal)
+{
+    vec3 tangent0;
+    float ax = fabs(normal.x);
+    float ay = fabs(normal.y);
+    float az = fabs(normal.z);
+    if (ax > ay && ax > az) {
+        tangent0 = vec3(0,0,-1);
+    }
+    else {
+        tangent0 = vec3(1,0,0);
+    }
+    // if (ax > ay) {
+    //     if (ax > az) {
+    //         tangent0 = vec3(0,0,-1);
+    //     }
+    //     else {
+    //         tangent0 = vec3(1,0,0);
+    //     }
+    // }
+    // else {
+    //     if (ay > az) {
+    //         tangent0 = vec3(1,0,0);
+    //     }
+    //     else {
+    //         tangent0 = vec3(1,0,0);
+    //     }
+    // }
+    vec3 bitangent = cross(normal, tangent0);
+    vec3 tangent = cross(bitangent, normal);
+
+    return {{ tangent.x, bitangent.x, normal.x, 0,
+              tangent.y, bitangent.y, normal.y, 0,
+              tangent.z, bitangent.z, normal.z, 0 }};
+}
+
+
+// Sampling formulas from http://web.cs.wpi.edu/~emmanuel/courses/cs563/S07/talks/emmanuel_agu_mc_wk10_p2.pdf
+
+std::tuple<float, float> sample_disk (float u1, float u2)
+{
+    float theta = 2 * M_PI * u1;
+    float r = sqrtf(u2);
+    return std::make_tuple(cos(theta) * r, sin(theta) * r);
+}
+
+vec3 sample_hemisphere (float u1, float u2)
+{
+    float r = sqrtf(1.0f - u1*u1);
+    float phi = 2 * M_PI * u2;
+    return vec3(cos(phi) * r, sin(phi) * r, u1);
+}
+
+vec3 sample_hemisphere_cosine (float u1, float u2)
+{
+    float x, y;
+    std::tie(x, y) = sample_disk(u1, u2);
+    float z = sqrtf( std::max(0.0f, 1.0f - x*x - y*y) );
+    return vec3{x,y,z};
+}
+
+float cos_theta (const vec3& v) { return v.z; }
+float abs_cos_theta (const vec3& v) { return fabs(v.z); }
+
+
+
+
+
 struct Sampler
 {
     int n;
@@ -139,21 +209,21 @@ vec3 spectrum_sample_to_xyz (float wavelength, float amplitude)
 
 vec3 xyz_to_linear_rgb (const vec3& xyz)
 {
-    static constexpr mat34 M = {
+    static constexpr mat34 M = {{
         3.2406, -1.5372, -0.4986, 0,
         -0.9689, 1.8758, 0.0415,  0,
         0.0557, -0.2040, 1.0570,  0,
-    };
+    }};
     return mul_rotation(M, xyz);
 }
 
 vec3 linear_rgb_to_xyz (const vec3& rgb)
 {
-    static constexpr mat34 M = {
+    static constexpr mat34 M = {{
         0.4124, 0.3576, 0.1805, 0,
         0.2126, 0.7152, 0.0722,  0,
         0.0193, 0.1192, 0.9505,  0,
-    };
+    }};
     return mul_rotation(M, rgb);
 }
 
@@ -231,7 +301,7 @@ struct SolidSampledSpectrum
 {
     float min, max;
     std::vector<float> samples;
-    float sample (float wavelen)
+    float sample (float wavelen) const
     {
         if (wavelen < min || wavelen >= max) return 0.0f;
         return samples[int(samples.size() * (wavelen - min) / (max - min))];
@@ -338,9 +408,97 @@ public:
 };
 
 
+class SurfaceMaterial {
+protected:
+    SurfaceMaterial (const SolidSampledSpectrum& ri)
+        : refractive_index(ri)
+        { }
+
+public:
+    /// surface film may have different ior than the volume material (e.g. metal plated glass)
+    SolidSampledSpectrum refractive_index;
+
+    virtual float fr (const vec3& wo, vec3& wi, float wavelen, float& pdf, float u1, float u2) const = 0;
+    float h;
+};
+
+class VolumeMaterial {
+protected:
+    VolumeMaterial (const SolidSampledSpectrum& ri, const SolidSampledSpectrum& ab)
+        : refractive_index(ri),
+        absorbance(ab)
+        { }
+public:
+    SolidSampledSpectrum refractive_index;
+    SolidSampledSpectrum absorbance;
+
+    float absorb (float t, float wavelen) const
+    {
+        float a = absorbance.sample(wavelen);
+        return exp(-t * a);
+    }
+};
+
+float brdf_lambertian (const vec3& wo, vec3& wi, float& pdf, float u1, float u2);
+
+class Matte : public SurfaceMaterial
+{
+public:
+    Matte(const SolidSampledSpectrum& reflectance)
+        : SurfaceMaterial(SolidSampledSpectrum(1.0)),
+        reflectance(reflectance)
+    { }
+
+    SolidSampledSpectrum reflectance;
+
+    float fr (const vec3& wo, vec3& wi, float wavelen, float& pdf, float u1, float u2) const
+    {
+        return reflectance.sample(wavelen) * brdf_lambertian(wo, wi, pdf, u1, u2);
+    }
+    
+};
+
+class TransparentSurface : public SurfaceMaterial
+{
+public:
+    TransparentSurface()
+        : SurfaceMaterial(SolidSampledSpectrum(1.0))
+    { }
+
+    float fr (const vec3& wo, vec3& wi, float wavelen, float& pdf, float u1, float u2) const
+    {
+        wi = -wo;
+        pdf = 1.0;
+        return 1.0 / abs_cos_theta(wi);
+    }
+    
+};
+
+class CleanAir : public VolumeMaterial
+{
+public:
+    CleanAir ()
+        : VolumeMaterial(SolidSampledSpectrum(1.0), SolidSampledSpectrum(0.0))
+    { }
+};
+
+class DirtyAir : public VolumeMaterial
+{
+public:
+    DirtyAir (const SolidSampledSpectrum& a)
+        : VolumeMaterial(SolidSampledSpectrum(1.0), a)
+    { }
+};
+
+
 class GeometricObject {
 public:
     std::shared_ptr<Shape> shape;
+
+    std::shared_ptr<SurfaceMaterial> surfmat;
+    std::shared_ptr<VolumeMaterial> volmat;
+
+    int priority;
 };
 
 
@@ -374,74 +532,11 @@ public:
 //     return hit;
 // }
 
-
-mat34 basis_from_normal (const vec3& normal)
-{
-    vec3 tangent0;
-    float ax = fabs(normal.x);
-    float ay = fabs(normal.y);
-    float az = fabs(normal.z);
-    if (ax > ay && ax > az) {
-        tangent0 = vec3(0,0,-1);
-    }
-    else {
-        tangent0 = vec3(1,0,0);
-    }
-    // if (ax > ay) {
-    //     if (ax > az) {
-    //         tangent0 = vec3(0,0,-1);
-    //     }
-    //     else {
-    //         tangent0 = vec3(1,0,0);
-    //     }
-    // }
-    // else {
-    //     if (ay > az) {
-    //         tangent0 = vec3(1,0,0);
-    //     }
-    //     else {
-    //         tangent0 = vec3(1,0,0);
-    //     }
-    // }
-    vec3 bitangent = cross(normal, tangent0);
-    vec3 tangent = cross(bitangent, normal);
-
-    return { tangent.x, bitangent.x, normal.x, 0,
-             tangent.y, bitangent.y, normal.y, 0,
-             tangent.z, bitangent.z, normal.z, 0 };
-}
-
-
-// Sampling formulas from http://web.cs.wpi.edu/~emmanuel/courses/cs563/S07/talks/emmanuel_agu_mc_wk10_p2.pdf
-
-std::tuple<float, float> sample_disk (float u1, float u2)
-{
-    float theta = 2 * M_PI * u1;
-    float r = sqrtf(u2);
-    return std::make_tuple(cos(theta) * r, sin(theta) * r);
-}
-
-vec3 sample_hemisphere (float u1, float u2)
-{
-    float r = sqrtf(1.0f - u1*u1);
-    float phi = 2 * M_PI * u2;
-    return vec3(cos(phi) * r, sin(phi) * r, u1);
-}
-
-vec3 sample_hemisphere_cosine (float u1, float u2)
-{
-    float x, y;
-    std::tie(x, y) = sample_disk(u1, u2);
-    float z = sqrtf( std::max(0.0f, 1.0f - x*x - y*y) );
-    return vec3{x,y,z};
-}
-
-float cos_theta (const vec3& v) { return v.z; }
-
 #include <algorithm>
 #include <cstdio>
 float environment (const vec3& v)
 {
+    printf("env %f,%f,%f -> %f / %f\n", v.x,v.y,v.z, dot(v, vec3(0,1,0)), std::max(0.0f, dot(v, vec3(0,1,0))));
     return std::max(0.0f, dot(v, vec3(0,1,0)));
     // return 1.0;
 }
@@ -467,47 +562,101 @@ float brdf_perfect_specular (const vec3& wo, vec3& wi, float& pdf, float u1, flo
     return 1.0 / cos_theta(wi);
 }
 
+float brdf_transparent (const vec3& wo, vec3& wi, float& pdf)
+{
+    wi = -wo;
+    pdf = 1.0;
+    return 1.0 / abs_cos_theta(wi);
+}
+
 std::vector<GeometricObject> objects = {
-    { std::make_shared<Sphere>() },
-    { std::make_shared<Plane>() },
+    { std::make_shared<Sphere>(), std::make_shared<TransparentSurface>(), std::make_shared<DirtyAir>(vec3(.5,.5,.5)), 10 },
+    // { std::make_shared<Sphere>(), std::make_shared<TransparentSurface>(), std::make_shared<CleanAir>(), 10 },
+    // { std::make_shared<Sphere>(), std::make_shared<Matte>(vec3(0.0,1.0,0.0)), std::make_shared<DirtyAir>(vec3(.5,.5,.5)), 10 },
+    { std::make_shared<Plane>(), std::make_shared<Matte>(vec3(1.0,1.0,1.0)), std::make_shared<CleanAir>(), 2 },
 };
+std::vector<const GeometricObject*> objstack;
+
+bool in_objstack (const GeometricObject* obj)
+{
+    auto it = find(objstack.begin(), objstack.end(), obj);
+    return it != objstack.end();
+}
 
 float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index, int nested=0)
 {
+    if (nested==0) { objstack.clear(); }
     if (nested>10) return 0.0f;
-    // Sphere sh1 = Sphere();
-    // Plane sh2 = Plane();
     bool hit = false;
+    printf("--\n");
     for (const auto& o : objects) {
-        if (o.shape->intersect(ray, ray.originator==&o, false)) {
+        printf("test %p, %d %d\n", &o,  ray.originator==&o, in_objstack(&o));
+        if (o.shape->intersect(ray, ray.originator==&o, in_objstack(&o))) {
             ray.hit_object = &o;
             hit = true;
         }
     }
-    // bool hit = o1.shape->intersect(ray, ray.originator==o1, false) || o2.shape->intersect(ray, ray.originator==o2, false);
-    // bool hit = sh2.intersect(ray);
-    if (!hit) return environment(ray.direction);
+    printf("%s %p, tmax %f, dir %f,%f,%f\n", hit?"hit":"miss",ray.hit_object, ray.tmax, ray.direction.x, ray.direction.y, ray.direction.z);
+    if (!hit) {
+        // return environment(ray.direction);
+        float e = environment(ray.direction);
+        printf("e=%f\n", e);
+        return e;
+    }
+
+
+    float absorbtion = 1.0;
+    if (objstack.size() > 0) {
+        auto it = std::max_element(objstack.begin(),objstack.end(),
+            [](const GeometricObject* a, const GeometricObject* b)->bool{return a->priority<b->priority;});
+        printf("priority object %p\n", *it);
+        absorbtion = (*it)->volmat->absorb(ray.tmax, wavelen);
+    }
+
 
     mat34 from_tangent = basis_from_normal(ray.normal);
+    mat34 to_tangent = inverse_rotation(from_tangent);
 
-    vec3 wo_t = mul_rotation_transpose(from_tangent, -ray.direction);
+    vec3 wo_t = mul_rotation(to_tangent, -ray.direction);
     // vec3 wi_t = vec3(0, 0, 1);
     // vec3 wi_t = vec3(-wo_t.x, -wo_t.y, wo_t.z);
     vec3 sample = sampler.shading[sample_index];
     vec3 wi_t;
     float pdf;
     // float fr = brdf_lambertian(wo_t, wi_t, pdf, sample[0], sample[1]);
-    float fr = brdf_lambertian(wo_t, wi_t, pdf, frand(), frand());
+    // float fr = brdf_lambertian(wo_t, wi_t, pdf, frand(), frand());
+    float fr = ray.hit_object->surfmat->fr(wo_t, wi_t, wavelen, pdf, frand(), frand());
     vec3 wi_w = mul_rotation(from_tangent, wi_t);
+    vec3 wo_w = -ray.direction;
+    printf("wo_w  %f, %f, %f\n", wo_w.x, wo_w.y, wo_w.z);
+    printf("wo_t  %f, %f, %f\n", wo_t.x, wo_t.y, wo_t.z);
+    printf("wi_t  %f, %f, %f\n", wi_t.x, wi_t.y, wi_t.z);
+    printf("wi_w  %f, %f, %f\n", wi_w.x, wi_w.y, wi_w.z);
 
     // SolidXyzCurveSpectrum R = { srgb_to_xyz(vec3{0.0, 1.0, 0.0}) };
     // SolidSampledSpectrum R = { 400, 700, {0,1,1,0} };
     SolidSampledSpectrum R(vec3(1,1,1));
 
+    bool enter = ( dot(wi_w, ray.normal) < 0 );
+    if (enter) {
+        objstack.push_back(ray.hit_object);
+    }
+    else {
+        auto it = find(objstack.begin(), objstack.end(), ray.hit_object);
+        if (it != objstack.end()) {
+            objstack.erase(it);
+        }
+    }
+
     Ray next_ray = {ray.position, wi_w, 1000.0, ray.hit_object};
     float L = radiance(next_ray, wavelen, sampler, sample_index, nested+1);
 
-    return R.sample(wavelen) * fr * L * cos_theta(wi_t) / pdf;
+    printf("L %f\n", L);
+    // printf("absorbtion %f\n", absorbtion);
+    // printf("fr %f\n", fr);
+    // printf("pdf %f\n", pdf);
+    // printf("abs_cos_theta %f\n", abs_cos_theta(wi_t));
+    return R.sample(wavelen) * absorbtion * fr * L * abs_cos_theta(wi_t) / pdf;
 
     // brdf = ray.material.brdf(ray.position);
     // wo_tangent = transform(-ray.direction);
@@ -634,15 +783,21 @@ int main ()
 {
     constexpr int W = 100;
     constexpr int H = 100;
-    constexpr int S = 1000;
+    constexpr int S = 1;
     printf("Rendering %dx%d with %d samples/pixel\n", W, H, S);
     Framebuffer framebuffer(W, H);
     vec3 origin = vec3(0,.3,2);
     Sampler sampler = Sampler(S);
     sampler.generate();
     auto start = std::chrono::system_clock::now();
+// #define SINGLE
+#ifdef SINGLE
+    for (int y = 60; y < 61; y++) {
+        for (int x = 40; x < 41; x++) {
+#else
     for (int y = 0; y < H; y++) {
         for (int x = 0; x < W; x++) {
+#endif
     // sampler.generate();
             sampler.next();
             for (int s = 0; s < S; s++) {
@@ -654,6 +809,7 @@ int main ()
 
                 Ray ray = {origin, direction, 1000.0, nullptr};
                 float L = radiance(ray, wavelen, sampler, s);
+                printf("--> L=%f\n", L);
                 vec3 rgb = xyz_to_linear_rgb(spectrum_sample_to_xyz(wavelen, L));
                 framebuffer.add_sample(x, y, rgb);
             }

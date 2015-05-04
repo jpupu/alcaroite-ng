@@ -383,6 +383,49 @@ public:
     }
 };
 
+class ScaledSphere : public Shape {
+public:
+    ScaledSphere (float r) : radius(r) {}
+
+    float radius;
+
+    bool intersect (Ray& ray, bool is_originator, bool inside_originator) const
+    {
+        float b = 2 * dot(ray.origin, ray.direction);
+        float c = dot(ray.origin, ray.origin) - radius*radius;
+        float d = b*b - 4*c;
+
+        if (d < 0) {
+            return false;
+        }
+
+        // float t1 = (-b - sqrtf(d)) / 2.0;
+        // float t2 = (-b + sqrtf(d)) / 2.0;
+        float t1 = (b + sqrtf(d)) / -2.0;
+        float t2 = (b - sqrtf(d)) / -2.0;
+
+        float t;
+        if (is_originator) {
+            t = inside_originator ? t2 : t1;
+        }
+        else {
+            t = (t1 < 0.0f) ? t2 : t1;
+        }
+
+        // float t = t1;
+        // if (t > ray.tmax) return false;
+        // if (t < 0.0f) t = t2;
+        if (t < 0.0f) return false;
+        if (t > ray.tmax) return false;
+
+        ray.tmax = t;
+        ray.position = ray.origin + ray.direction * t;
+        ray.normal = normalize(ray.position);
+
+        return true;
+    }
+};
+
 class Plane : public Shape {
 public:
     bool intersect (Ray& ray, bool is_originator, bool inside_originator) const
@@ -570,10 +613,11 @@ float brdf_transparent (const vec3& wo, vec3& wi, float& pdf)
 }
 
 std::vector<GeometricObject> objects = {
-    { std::make_shared<Sphere>(), std::make_shared<TransparentSurface>(), std::make_shared<DirtyAir>(vec3(.5,.5,.5)), 10 },
-    // { std::make_shared<Sphere>(), std::make_shared<TransparentSurface>(), std::make_shared<CleanAir>(), 10 },
+    // { std::make_shared<Sphere>(), std::make_shared<TransparentSurface>(), std::make_shared<DirtyAir>(vec3(.5,.5,.5)), 10 },
+    { std::make_shared<ScaledSphere>(1.3), std::make_shared<TransparentSurface>(), std::make_shared<DirtyAir>(vec3(.995,.95,.85)), 20 },
+    { std::make_shared<Sphere>(), std::make_shared<TransparentSurface>(), std::make_shared<CleanAir>(), 100 },
     // { std::make_shared<Sphere>(), std::make_shared<Matte>(vec3(0.0,1.0,0.0)), std::make_shared<DirtyAir>(vec3(.5,.5,.5)), 10 },
-    { std::make_shared<Plane>(), std::make_shared<Matte>(vec3(1.0,1.0,1.0)), std::make_shared<CleanAir>(), 2 },
+    { std::make_shared<Plane>(), std::make_shared<Matte>(vec3(1.0,1.0,1.0)), std::make_shared<CleanAir>(), 200 },
 };
 std::vector<const GeometricObject*> objstack;
 
@@ -581,6 +625,27 @@ bool in_objstack (const GeometricObject* obj)
 {
     auto it = find(objstack.begin(), objstack.end(), obj);
     return it != objstack.end();
+}
+
+const GeometricObject* top_objstack ()
+{
+    if (objstack.size() == 0) return nullptr;
+    auto it = std::max_element(objstack.begin(),objstack.end(),
+        [](const GeometricObject* a, const GeometricObject* b)->bool{return a->priority<b->priority;});
+    return *it;    
+}
+
+void add_objstack (const GeometricObject* obj)
+{
+    objstack.push_back(obj);
+}
+
+void remove_objstack (const GeometricObject* obj)
+{
+    auto it = find(objstack.begin(), objstack.end(), obj);
+    if (it != objstack.end()) {
+        objstack.erase(it);
+    }
 }
 
 float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index, int nested=0)
@@ -604,48 +669,54 @@ float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index, int
         return e;
     }
 
-
     float absorbtion = 1.0;
     if (objstack.size() > 0) {
-        auto it = std::max_element(objstack.begin(),objstack.end(),
-            [](const GeometricObject* a, const GeometricObject* b)->bool{return a->priority<b->priority;});
-        printf("priority object %p\n", *it);
-        absorbtion = (*it)->volmat->absorb(ray.tmax, wavelen);
+        absorbtion = top_objstack()->volmat->absorb(ray.tmax, wavelen);
     }
 
 
-    mat34 from_tangent = basis_from_normal(ray.normal);
-    mat34 to_tangent = inverse_rotation(from_tangent);
+    if (dot(ray.direction, ray.normal) < 0) {
+        add_objstack(ray.hit_object);
+    }
 
-    vec3 wo_t = mul_rotation(to_tangent, -ray.direction);
-    // vec3 wi_t = vec3(0, 0, 1);
-    // vec3 wi_t = vec3(-wo_t.x, -wo_t.y, wo_t.z);
-    vec3 sample = sampler.shading[sample_index];
-    vec3 wi_t;
-    float pdf;
-    // float fr = brdf_lambertian(wo_t, wi_t, pdf, sample[0], sample[1]);
-    // float fr = brdf_lambertian(wo_t, wi_t, pdf, frand(), frand());
-    float fr = ray.hit_object->surfmat->fr(wo_t, wi_t, wavelen, pdf, frand(), frand());
-    vec3 wi_w = mul_rotation(from_tangent, wi_t);
-    vec3 wo_w = -ray.direction;
-    printf("wo_w  %f, %f, %f\n", wo_w.x, wo_w.y, wo_w.z);
-    printf("wo_t  %f, %f, %f\n", wo_t.x, wo_t.y, wo_t.z);
-    printf("wi_t  %f, %f, %f\n", wi_t.x, wi_t.y, wi_t.z);
-    printf("wi_w  %f, %f, %f\n", wi_w.x, wi_w.y, wi_w.z);
+    bool true_intersection = (ray.hit_object == top_objstack());
 
-    // SolidXyzCurveSpectrum R = { srgb_to_xyz(vec3{0.0, 1.0, 0.0}) };
-    // SolidSampledSpectrum R = { 400, 700, {0,1,1,0} };
-    SolidSampledSpectrum R(vec3(1,1,1));
+    vec3 wi_w;
+    float factor;
 
-    bool enter = ( dot(wi_w, ray.normal) < 0 );
-    if (enter) {
-        objstack.push_back(ray.hit_object);
+    if (true_intersection) {
+        mat34 from_tangent = basis_from_normal(ray.normal);
+        mat34 to_tangent = inverse_rotation(from_tangent);
+
+        vec3 wo_t = mul_rotation(to_tangent, -ray.direction);
+        // vec3 wi_t = vec3(0, 0, 1);
+        // vec3 wi_t = vec3(-wo_t.x, -wo_t.y, wo_t.z);
+        vec3 sample = sampler.shading[sample_index];
+        vec3 wi_t;
+        float pdf;
+        // float fr = brdf_lambertian(wo_t, wi_t, pdf, sample[0], sample[1]);
+        // float fr = brdf_lambertian(wo_t, wi_t, pdf, frand(), frand());
+        float fr = ray.hit_object->surfmat->fr(wo_t, wi_t, wavelen, pdf, frand(), frand());
+        wi_w = mul_rotation(from_tangent, wi_t);
+        vec3 wo_w = -ray.direction;
+        printf("wo_w  %f, %f, %f\n", wo_w.x, wo_w.y, wo_w.z);
+        printf("wo_t  %f, %f, %f\n", wo_t.x, wo_t.y, wo_t.z);
+        printf("wi_t  %f, %f, %f\n", wi_t.x, wi_t.y, wi_t.z);
+        printf("wi_w  %f, %f, %f\n", wi_w.x, wi_w.y, wi_w.z);
+
+        // SolidXyzCurveSpectrum R = { srgb_to_xyz(vec3{0.0, 1.0, 0.0}) };
+        // SolidSampledSpectrum R = { 400, 700, {0,1,1,0} };
+        SolidSampledSpectrum R(vec3(1,1,1));
+
+        factor = R.sample(wavelen) * fr * abs_cos_theta(wi_t) / pdf;
     }
     else {
-        auto it = find(objstack.begin(), objstack.end(), ray.hit_object);
-        if (it != objstack.end()) {
-            objstack.erase(it);
-        }
+        wi_w = ray.direction;
+        factor = 1.0;
+    }
+
+    if (dot(wi_w, ray.normal) > 0) {
+        remove_objstack(ray.hit_object);
     }
 
     Ray next_ray = {ray.position, wi_w, 1000.0, ray.hit_object};
@@ -656,7 +727,8 @@ float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index, int
     // printf("fr %f\n", fr);
     // printf("pdf %f\n", pdf);
     // printf("abs_cos_theta %f\n", abs_cos_theta(wi_t));
-    return R.sample(wavelen) * absorbtion * fr * L * abs_cos_theta(wi_t) / pdf;
+    // return R.sample(wavelen) * absorbtion * fr * L * abs_cos_theta(wi_t) / pdf;
+    return factor * absorbtion * L;
 
     // brdf = ray.material.brdf(ray.position);
     // wo_tangent = transform(-ray.direction);

@@ -619,44 +619,61 @@ std::vector<GeometricObject> objects = {
     // { std::make_shared<Sphere>(), std::make_shared<Matte>(vec3(0.0,1.0,0.0)), std::make_shared<DirtyAir>(vec3(.5,.5,.5)), 10 },
     { std::make_shared<Plane>(), std::make_shared<Matte>(vec3(1.0,1.0,1.0)), std::make_shared<CleanAir>(), 200 },
 };
-std::vector<const GeometricObject*> objstack;
 
-bool in_objstack (const GeometricObject* obj)
+class InteriorList
 {
-    auto it = find(objstack.begin(), objstack.end(), obj);
-    return it != objstack.end();
-}
+private:
+    std::vector<const GeometricObject*> list;
 
-const GeometricObject* top_objstack ()
-{
-    if (objstack.size() == 0) return nullptr;
-    auto it = std::max_element(objstack.begin(),objstack.end(),
-        [](const GeometricObject* a, const GeometricObject* b)->bool{return a->priority<b->priority;});
-    return *it;    
-}
-
-void add_objstack (const GeometricObject* obj)
-{
-    objstack.push_back(obj);
-}
-
-void remove_objstack (const GeometricObject* obj)
-{
-    auto it = find(objstack.begin(), objstack.end(), obj);
-    if (it != objstack.end()) {
-        objstack.erase(it);
+public:
+    bool has (const GeometricObject* obj) const
+    {
+        auto it = find(list.begin(), list.end(), obj);
+        return it != list.end();
     }
-}
+
+    const GeometricObject* top ()
+    {
+        if (list.size() == 0) return nullptr;
+        auto it = std::max_element(list.begin(),list.end(),
+            [](const GeometricObject* a, const GeometricObject* b)->bool{return a->priority<b->priority;});
+        return *it;
+    }
+
+    void add (const GeometricObject* obj)
+    {
+        list.push_back(obj);
+    }
+
+    void remove (const GeometricObject* obj)
+    {
+        auto it = find(list.begin(), list.end(), obj);
+        if (it != list.end()) {
+            list.erase(it);
+        }
+    }
+
+    void clear ()
+    {
+        list.clear();
+    }
+
+    size_t size () const {
+        return list.size();
+    }
+};
+
+InteriorList interior;
 
 float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index, int nested=0)
 {
-    if (nested==0) { objstack.clear(); }
+    if (nested==0) { interior.clear(); }
     if (nested>10) return 0.0f;
     bool hit = false;
     printf("--\n");
     for (const auto& o : objects) {
-        printf("test %p, %d %d\n", &o,  ray.originator==&o, in_objstack(&o));
-        if (o.shape->intersect(ray, ray.originator==&o, in_objstack(&o))) {
+        printf("test %p, %d %d\n", &o,  ray.originator==&o, interior.has(&o));
+        if (o.shape->intersect(ray, ray.originator==&o, interior.has(&o))) {
             ray.hit_object = &o;
             hit = true;
         }
@@ -670,16 +687,16 @@ float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index, int
     }
 
     float absorbtion = 1.0;
-    if (objstack.size() > 0) {
-        absorbtion = top_objstack()->volmat->absorb(ray.tmax, wavelen);
+    if (interior.size() > 0) {
+        absorbtion = interior.top()->volmat->absorb(ray.tmax, wavelen);
     }
 
 
     if (dot(ray.direction, ray.normal) < 0) {
-        add_objstack(ray.hit_object);
+        interior.add(ray.hit_object);
     }
 
-    bool true_intersection = (ray.hit_object == top_objstack());
+    bool true_intersection = (ray.hit_object == interior.top());
 
     vec3 wi_w;
     float factor;
@@ -716,7 +733,7 @@ float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index, int
     }
 
     if (dot(wi_w, ray.normal) > 0) {
-        remove_objstack(ray.hit_object);
+        interior.remove(ray.hit_object);
     }
 
     Ray next_ray = {ray.position, wi_w, 1000.0, ray.hit_object};

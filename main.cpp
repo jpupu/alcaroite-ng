@@ -6,6 +6,7 @@ using namespace pupumath_plain;
 #include <cstdlib>
 #include <tuple>
 #include <vector>
+#include <array>
 
 #ifndef M_PI
 #define M_PI 3.141592
@@ -235,7 +236,7 @@ vec3 srgb_to_xyz (vec3 rgb)
     return linear_rgb_to_xyz(rgb);
 }
 
-std::vector<float> linear_rgb_to_spectrum (const vec3& rgb)
+std::array<float, 10> linear_rgb_to_spectrum (const vec3& rgb)
 {
     // http://www.cs.utah.edu/~bes/papers/color/
     // Smits, Brian: An RGB to Spectrum Conversion for Reflectances
@@ -249,7 +250,7 @@ std::vector<float> linear_rgb_to_spectrum (const vec3& rgb)
     static float blue_spectrum[N] = {1,1,0.8916,0.3323,0,0,0.0003,0.0369,0.0483,0.0496};
     static float magenta_spectrum[N] = {1,1,.9685,.2229,0,0.0458,0.8369,1,1,0.9959};
 
-    std::vector<float> spectrum(N, 0.0f);
+    std::array<float, 10> spectrum = {{0,0,0,0,0, 0,0,0,0,0}};
 
     float r = rgb[0];
     float g = rgb[1];
@@ -297,20 +298,24 @@ std::vector<float> linear_rgb_to_spectrum (const vec3& rgb)
 }
 
 
-struct SolidSampledSpectrum
+struct Spectrum
 {
-    float min, max;
-    std::vector<float> samples;
+    static constexpr float min = 320;
+    static constexpr float max = 720;
+    static constexpr int count = 10;
+    static constexpr float count_over_max_minus_min = count / (max - min);
+    
+    std::array<float, count> samples;
+
     float sample (float wavelen) const
     {
         if (wavelen < min || wavelen >= max) return 0.0f;
-        return samples[int(samples.size() * (wavelen - min) / (max - min))];
+        return samples[int((wavelen - min) * count_over_max_minus_min)];
     }
 
-    SolidSampledSpectrum () {}
-    SolidSampledSpectrum (const vec3& linear_rgb)
-        : min(380), max(720),
-        samples( linear_rgb_to_spectrum(linear_rgb) )
+    Spectrum () {}
+    Spectrum (const vec3& linear_rgb)
+        : samples( linear_rgb_to_spectrum(linear_rgb) )
         { }
 };
 
@@ -459,8 +464,8 @@ protected:
         { }
 
 public:
-    SolidSampledSpectrum refractive_index;
-    SolidSampledSpectrum absorbance;
+    Spectrum refractive_index;
+    Spectrum absorbance;
 
     virtual float fr (const vec3& wo, vec3& wi, float wavelen, float surrounding_refractive_index, float& pdf, float u1, float u2) const = 0;
 
@@ -478,11 +483,11 @@ float btdf_dielectric (const vec3& wo, vec3& wi, float& pdf, float n1, float n2)
 class Matte : public Material
 {
 public:
-    Matte(const SolidSampledSpectrum& reflectance)
+    Matte(const Spectrum& reflectance)
         : reflectance(reflectance)
     { }
 
-    SolidSampledSpectrum reflectance;
+    Spectrum reflectance;
 
     float fr (const vec3& wo, vec3& wi, float wavelen, float surrounding_refractive_index, float& pdf, float u1, float u2) const
     {
@@ -494,11 +499,11 @@ public:
 class PerfectMirror : public Material
 {
 public:
-    PerfectMirror(const SolidSampledSpectrum& reflectance)
+    PerfectMirror(const Spectrum& reflectance)
         : reflectance(reflectance)
     { }
 
-    SolidSampledSpectrum reflectance;
+    Spectrum reflectance;
 
     float fr (const vec3& wo, vec3& wi, float wavelen, float surrounding_refractive_index, float& pdf, float u1, float u2) const
     {
@@ -510,15 +515,15 @@ public:
 class Glass : public Material
 {
 public:
-    Glass (const SolidSampledSpectrum& refractive_index,
-           const SolidSampledSpectrum& reflectance)
+    Glass (const Spectrum& refractive_index,
+           const Spectrum& reflectance)
         : reflectance(reflectance)
     {
         this->refractive_index = refractive_index;
         this->absorbance = vec3(0.0);
     }
 
-    SolidSampledSpectrum reflectance;
+    Spectrum reflectance;
 
     float fr (const vec3& wo, vec3& wi, float wavelen, float surrounding_refractive_index, float& pdf, float u1, float u2) const
     {
@@ -543,12 +548,12 @@ class Translucent : public Material
 public:
     Translucent()
     {
-        this->refractive_index = SolidSampledSpectrum(vec3(1.0));
+        this->refractive_index = Spectrum(vec3(1.0));
         this->absorbance = vec3(0.0);
     }
-    Translucent(const SolidSampledSpectrum& absorbance)
+    Translucent(const Spectrum& absorbance)
     {
-        this->refractive_index = SolidSampledSpectrum(vec3(1.0));
+        this->refractive_index = Spectrum(vec3(1.0));
         this->absorbance = absorbance;
     }
 
@@ -793,8 +798,8 @@ float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index, int
         // printf("wi_w  %f, %f, %f\n", wi_w.x, wi_w.y, wi_w.z);
 
         // SolidXyzCurveSpectrum R = { srgb_to_xyz(vec3{0.0, 1.0, 0.0}) };
-        // SolidSampledSpectrum R = { 400, 700, {0,1,1,0} };
-        SolidSampledSpectrum R(vec3(1,1,1));
+        // Spectrum R = { 400, 700, {0,1,1,0} };
+        Spectrum R(vec3(1,1,1));
 
         factor = R.sample(wavelen) * fr * abs_cos_theta(wi_t) / pdf;
     }

@@ -451,29 +451,18 @@ public:
 };
 
 
-class SurfaceMaterial {
+class Material {
 protected:
-    SurfaceMaterial (const SolidSampledSpectrum& ri)
-        : refractive_index(ri)
+    Material ()
+        : refractive_index(vec3(1.0)),
+        absorbance(vec3(1.0))
         { }
 
-public:
-    /// surface film may have different ior than the volume material (e.g. metal plated glass)
-    SolidSampledSpectrum refractive_index;
-
-    virtual float fr (const vec3& wo, vec3& wi, float wavelen, float surrounding_refractive_index, float& pdf, float u1, float u2) const = 0;
-    float h;
-};
-
-class VolumeMaterial {
-protected:
-    VolumeMaterial (const SolidSampledSpectrum& ri, const SolidSampledSpectrum& ab)
-        : refractive_index(ri),
-        absorbance(ab)
-        { }
 public:
     SolidSampledSpectrum refractive_index;
     SolidSampledSpectrum absorbance;
+
+    virtual float fr (const vec3& wo, vec3& wi, float wavelen, float surrounding_refractive_index, float& pdf, float u1, float u2) const = 0;
 
     float absorb (float t, float wavelen) const
     {
@@ -486,12 +475,11 @@ float brdf_lambertian (const vec3& wo, vec3& wi, float& pdf, float u1, float u2)
 float brdf_perfect_specular_reflection (const vec3& wo, vec3& wi, float& pdf, float u1, float u2);
 float btdf_dielectric (const vec3& wo, vec3& wi, float& pdf, float n1, float n2);
 
-class Matte : public SurfaceMaterial
+class Matte : public Material
 {
 public:
     Matte(const SolidSampledSpectrum& reflectance)
-        : SurfaceMaterial(SolidSampledSpectrum(1.0)),
-        reflectance(reflectance)
+        : reflectance(reflectance)
     { }
 
     SolidSampledSpectrum reflectance;
@@ -503,12 +491,11 @@ public:
     
 };
 
-class PerfectMirror : public SurfaceMaterial
+class PerfectMirror : public Material
 {
 public:
     PerfectMirror(const SolidSampledSpectrum& reflectance)
-        : SurfaceMaterial(SolidSampledSpectrum(1.0)),
-        reflectance(reflectance)
+        : reflectance(reflectance)
     { }
 
     SolidSampledSpectrum reflectance;
@@ -520,14 +507,16 @@ public:
     
 };
 
-class Glass : public SurfaceMaterial
+class Glass : public Material
 {
 public:
     Glass (const SolidSampledSpectrum& refractive_index,
            const SolidSampledSpectrum& reflectance)
-        : SurfaceMaterial(refractive_index),
-        reflectance(reflectance)
-    { }
+        : reflectance(reflectance)
+    {
+        this->refractive_index = refractive_index;
+        this->absorbance = vec3(0.0);
+    }
 
     SolidSampledSpectrum reflectance;
 
@@ -549,36 +538,26 @@ public:
 
 };
 
-class TransparentSurface : public SurfaceMaterial
+class Translucent : public Material
 {
 public:
-    TransparentSurface()
-        : SurfaceMaterial(SolidSampledSpectrum(1.0))
-    { }
+    Translucent()
+    {
+        this->refractive_index = SolidSampledSpectrum(vec3(1.0));
+        this->absorbance = vec3(0.0);
+    }
+    Translucent(const SolidSampledSpectrum& absorbance)
+    {
+        this->refractive_index = SolidSampledSpectrum(vec3(1.0));
+        this->absorbance = absorbance;
+    }
 
     float fr (const vec3& wo, vec3& wi, float wavelen, float surrounding_refractive_index, float& pdf, float u1, float u2) const
     {
         wi = -wo;
         pdf = 1.0;
         return 1.0 / abs_cos_theta(wi);
-    }
-    
-};
-
-class CleanAir : public VolumeMaterial
-{
-public:
-    CleanAir ()
-        : VolumeMaterial(SolidSampledSpectrum(1.0), SolidSampledSpectrum(0.0))
-    { }
-};
-
-class DirtyAir : public VolumeMaterial
-{
-public:
-    DirtyAir (const SolidSampledSpectrum& a)
-        : VolumeMaterial(SolidSampledSpectrum(1.0), a)
-    { }
+    }    
 };
 
 
@@ -586,8 +565,7 @@ class GeometricObject {
 public:
     std::shared_ptr<Shape> shape;
 
-    std::shared_ptr<SurfaceMaterial> surfmat;
-    std::shared_ptr<VolumeMaterial> volmat;
+    std::shared_ptr<Material> mat;
 
     int priority;
 };
@@ -705,10 +683,10 @@ float btdf_dielectric (const vec3& wo, vec3& wi, float& pdf, float n1, float n2)
 std::vector<GeometricObject> objects = {
     // { std::make_shared<Sphere>(), std::make_shared<TransparentSurface>(), std::make_shared<DirtyAir>(vec3(.5,.5,.5)), 10 },
     // { std::make_shared<ScaledSphere>(1.3), std::make_shared<Glass>(vec3(1.0), vec3(1.0)), std::make_shared<DirtyAir>(vec3(.995,.95,.85)), 20 },
-    { std::make_shared<ScaledSphere>(1.3), std::make_shared<Glass>(vec3(1.5), vec3(1.0)), std::make_shared<CleanAir>(), 20 },
+    { std::make_shared<ScaledSphere>(1.3), std::make_shared<Glass>(vec3(1.5), vec3(1.0)), 20 },
     // { std::make_shared<Sphere>(), std::make_shared<PerfectMirror>(vec3(1.0)), std::make_shared<CleanAir>(), 100 },
     // { std::make_shared<Sphere>(), std::make_shared<Matte>(vec3(0.0,1.0,0.0)), std::make_shared<DirtyAir>(vec3(.5,.5,.5)), 10 },
-    // { std::make_shared<Plane>(), std::make_shared<Matte>(vec3(1.0,1.0,1.0)), std::make_shared<CleanAir>(), 200 },
+    { std::make_shared<Plane>(), std::make_shared<Matte>(vec3(1.0)), 200 },
 };
 
 class InteriorList
@@ -780,8 +758,8 @@ float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index, int
     float absorbtion = 1.0;
     float surrounding_refractive_index = 1.0;
     if (interior.size() > 0) {
-        absorbtion = interior.top()->volmat->absorb(ray.tmax, wavelen);
-        surrounding_refractive_index = interior.top()->surfmat->refractive_index.sample(wavelen);
+        absorbtion = interior.top()->mat->absorb(ray.tmax, wavelen);
+        surrounding_refractive_index = interior.top()->mat->refractive_index.sample(wavelen);
     }
 
 
@@ -806,7 +784,7 @@ float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index, int
         float pdf;
         // float fr = brdf_lambertian(wo_t, wi_t, pdf, sample[0], sample[1]);
         // float fr = brdf_lambertian(wo_t, wi_t, pdf, frand(), frand());
-        float fr = ray.hit_object->surfmat->fr(wo_t, wi_t, wavelen, surrounding_refractive_index, pdf, frand(), frand());
+        float fr = ray.hit_object->mat->fr(wo_t, wi_t, wavelen, surrounding_refractive_index, pdf, frand(), frand());
         wi_w = mul_rotation(from_tangent, wi_t);
         vec3 wo_w = -ray.direction;
         // printf("wo_w  %f, %f, %f\n", wo_w.x, wo_w.y, wo_w.z);

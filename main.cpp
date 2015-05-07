@@ -108,9 +108,9 @@ Sampler::Sampler (int n)
 void Sampler::generate ()
 {
     {
-        const float step = 380.f / n;
+        const float step = 340.f / n;
         for (int i = 0; i < n; i++) {
-            wavelen[i] = 420.f + (i + frand()) * step;
+            wavelen[i] = 380.f + (i + frand()) * step;
         }
     }
 
@@ -461,7 +461,7 @@ public:
     /// surface film may have different ior than the volume material (e.g. metal plated glass)
     SolidSampledSpectrum refractive_index;
 
-    virtual float fr (const vec3& wo, vec3& wi, float wavelen, float& pdf, float u1, float u2) const = 0;
+    virtual float fr (const vec3& wo, vec3& wi, float wavelen, float surrounding_refractive_index, float& pdf, float u1, float u2) const = 0;
     float h;
 };
 
@@ -483,6 +483,8 @@ public:
 };
 
 float brdf_lambertian (const vec3& wo, vec3& wi, float& pdf, float u1, float u2);
+float brdf_perfect_specular_reflection (const vec3& wo, vec3& wi, float& pdf, float u1, float u2);
+float btdf_dielectric (const vec3& wo, vec3& wi, float& pdf, float n1, float n2);
 
 class Matte : public SurfaceMaterial
 {
@@ -494,11 +496,57 @@ public:
 
     SolidSampledSpectrum reflectance;
 
-    float fr (const vec3& wo, vec3& wi, float wavelen, float& pdf, float u1, float u2) const
+    float fr (const vec3& wo, vec3& wi, float wavelen, float surrounding_refractive_index, float& pdf, float u1, float u2) const
     {
         return reflectance.sample(wavelen) * brdf_lambertian(wo, wi, pdf, u1, u2);
     }
     
+};
+
+class PerfectMirror : public SurfaceMaterial
+{
+public:
+    PerfectMirror(const SolidSampledSpectrum& reflectance)
+        : SurfaceMaterial(SolidSampledSpectrum(1.0)),
+        reflectance(reflectance)
+    { }
+
+    SolidSampledSpectrum reflectance;
+
+    float fr (const vec3& wo, vec3& wi, float wavelen, float surrounding_refractive_index, float& pdf, float u1, float u2) const
+    {
+        return reflectance.sample(wavelen) * brdf_perfect_specular_reflection(wo, wi, pdf, u1, u2);
+    }
+    
+};
+
+class Glass : public SurfaceMaterial
+{
+public:
+    Glass (const SolidSampledSpectrum& refractive_index,
+           const SolidSampledSpectrum& reflectance)
+        : SurfaceMaterial(refractive_index),
+        reflectance(reflectance)
+    { }
+
+    SolidSampledSpectrum reflectance;
+
+    float fr (const vec3& wo, vec3& wi, float wavelen, float surrounding_refractive_index, float& pdf, float u1, float u2) const
+    {
+        if (frand() < .5) {
+            return reflectance.sample(wavelen) * brdf_perfect_specular_reflection(wo, wi, pdf, u1, u2);
+        }
+        else {
+            float n1 = surrounding_refractive_index;
+            float n2 = refractive_index.sample(wavelen);
+            if (wo.z < 0) { std::swap(n1, n2); }
+            return btdf_dielectric(wo, wi, pdf, n1, n2);
+            // wi = -wo;
+            // pdf = 1.0;
+            // return 1.0 / abs_cos_theta(wi);
+        }
+    }
+
 };
 
 class TransparentSurface : public SurfaceMaterial
@@ -508,7 +556,7 @@ public:
         : SurfaceMaterial(SolidSampledSpectrum(1.0))
     { }
 
-    float fr (const vec3& wo, vec3& wi, float wavelen, float& pdf, float u1, float u2) const
+    float fr (const vec3& wo, vec3& wi, float wavelen, float surrounding_refractive_index, float& pdf, float u1, float u2) const
     {
         wi = -wo;
         pdf = 1.0;
@@ -579,7 +627,21 @@ public:
 #include <cstdio>
 float environment (const vec3& v)
 {
-    printf("env %f,%f,%f -> %f / %f\n", v.x,v.y,v.z, dot(v, vec3(0,1,0)), std::max(0.0f, dot(v, vec3(0,1,0))));
+    // return 1.0;
+    float theta = M_PI/2 - acosf(v.y);
+    float phi = atan2f(v.x, v.z);
+    // printf("env %f,%f,%f -> %f / %f\n", v.x,v.y,v.z, dot(v, vec3(0,1,0)), std::max(0.0f, dot(v, vec3(0,1,0))));
+
+    constexpr float F = M_PI / 180;
+    float L = 0.5f + theta;
+    // if (phi > 350*F || phi < 30*F) L = 1.0;
+    if (40*F < phi && phi < 100*F && theta > 40*F && theta < 70*F) L = 4.0;
+    if (-70*F < phi && phi < -30*F && theta > 20*F && theta < 50*F) L = 2.0;
+    // if (theta > 0*F) L = 1.0;
+
+
+    return L;
+    return std::max(0.0f, sinf(phi*10));
     return std::max(0.0f, dot(v, vec3(0,1,0)));
     // return 1.0;
 }
@@ -598,11 +660,11 @@ float brdf_lambertian (const vec3& wo, vec3& wi, float& pdf, float u1, float u2)
     return 1.0 / M_PI;;
 }
 
-float brdf_perfect_specular (const vec3& wo, vec3& wi, float& pdf, float u1, float u2)
+float brdf_perfect_specular_reflection (const vec3& wo, vec3& wi, float& pdf, float u1, float u2)
 {
     wi = vec3{-wo.x, -wo.y, wo.z};
     pdf = 1.0;
-    return 1.0 / cos_theta(wi);
+    return 1.0 / abs_cos_theta(wi);
 }
 
 float brdf_transparent (const vec3& wo, vec3& wi, float& pdf)
@@ -612,12 +674,41 @@ float brdf_transparent (const vec3& wo, vec3& wi, float& pdf)
     return 1.0 / abs_cos_theta(wi);
 }
 
+float btdf_dielectric (const vec3& wo, vec3& wi, float& pdf, float n1, float n2)
+{
+    // Assume that the ray always comes from n1 to n2, regardless of normal direction.
+    bool flip = ( wo.z < 0 );
+    pdf = 1.0;
+
+    if (fabs(wo.z) == 1) {
+        wi = -wo;
+        return 1;
+    }
+
+    float cos_theta1 = abs_cos_theta(wo);
+    float sin_theta1 = sqrtf(1 - cos_theta1*cos_theta1); // assume 0 < cos_theta1 < pi
+
+    float sin_theta2 = sin_theta1 * n1 / n2;
+    float cos_theta2 = sqrtf(1 - sin_theta2*sin_theta2);
+
+    // printf("cos_theta1 %f\n", cos_theta1);
+    // printf("sin_theta1 %f\n", sin_theta1);
+    // printf("sin_theta2 %f\n", sin_theta2);
+    // printf("cos_theta2 %f\n", cos_theta2);
+
+    wi.x = -wo.x / sin_theta1 * sin_theta2;
+    wi.y = -wo.y / sin_theta1 * sin_theta2;
+    wi.z = flip ? cos_theta2 : -cos_theta2;
+    return 1.0 / abs_cos_theta(wi);
+}
+
 std::vector<GeometricObject> objects = {
     // { std::make_shared<Sphere>(), std::make_shared<TransparentSurface>(), std::make_shared<DirtyAir>(vec3(.5,.5,.5)), 10 },
-    { std::make_shared<ScaledSphere>(1.3), std::make_shared<TransparentSurface>(), std::make_shared<DirtyAir>(vec3(.995,.95,.85)), 20 },
-    { std::make_shared<Sphere>(), std::make_shared<TransparentSurface>(), std::make_shared<CleanAir>(), 100 },
+    // { std::make_shared<ScaledSphere>(1.3), std::make_shared<Glass>(vec3(1.0), vec3(1.0)), std::make_shared<DirtyAir>(vec3(.995,.95,.85)), 20 },
+    { std::make_shared<ScaledSphere>(1.3), std::make_shared<Glass>(vec3(1.5), vec3(1.0)), std::make_shared<CleanAir>(), 20 },
+    // { std::make_shared<Sphere>(), std::make_shared<PerfectMirror>(vec3(1.0)), std::make_shared<CleanAir>(), 100 },
     // { std::make_shared<Sphere>(), std::make_shared<Matte>(vec3(0.0,1.0,0.0)), std::make_shared<DirtyAir>(vec3(.5,.5,.5)), 10 },
-    { std::make_shared<Plane>(), std::make_shared<Matte>(vec3(1.0,1.0,1.0)), std::make_shared<CleanAir>(), 200 },
+    // { std::make_shared<Plane>(), std::make_shared<Matte>(vec3(1.0,1.0,1.0)), std::make_shared<CleanAir>(), 200 },
 };
 
 class InteriorList
@@ -668,27 +759,29 @@ InteriorList interior;
 float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index, int nested=0)
 {
     if (nested==0) { interior.clear(); }
-    if (nested>10) return 0.0f;
+    if (nested>100) return 0.0f;
     bool hit = false;
-    printf("--\n");
+    // printf("--\n");
     for (const auto& o : objects) {
-        printf("test %p, %d %d\n", &o,  ray.originator==&o, interior.has(&o));
+        // printf("test %p, %d %d\n", &o,  ray.originator==&o, interior.has(&o));
         if (o.shape->intersect(ray, ray.originator==&o, interior.has(&o))) {
             ray.hit_object = &o;
             hit = true;
         }
     }
-    printf("%s %p, tmax %f, dir %f,%f,%f\n", hit?"hit":"miss",ray.hit_object, ray.tmax, ray.direction.x, ray.direction.y, ray.direction.z);
+    // printf("%s %p, tmax %f, dir %f,%f,%f\n", hit?"hit":"miss",ray.hit_object, ray.tmax, ray.direction.x, ray.direction.y, ray.direction.z);
     if (!hit) {
         // return environment(ray.direction);
         float e = environment(ray.direction);
-        printf("e=%f\n", e);
+        // printf("e=%f\n", e);
         return e;
     }
 
     float absorbtion = 1.0;
+    float surrounding_refractive_index = 1.0;
     if (interior.size() > 0) {
         absorbtion = interior.top()->volmat->absorb(ray.tmax, wavelen);
+        surrounding_refractive_index = interior.top()->surfmat->refractive_index.sample(wavelen);
     }
 
 
@@ -713,13 +806,13 @@ float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index, int
         float pdf;
         // float fr = brdf_lambertian(wo_t, wi_t, pdf, sample[0], sample[1]);
         // float fr = brdf_lambertian(wo_t, wi_t, pdf, frand(), frand());
-        float fr = ray.hit_object->surfmat->fr(wo_t, wi_t, wavelen, pdf, frand(), frand());
+        float fr = ray.hit_object->surfmat->fr(wo_t, wi_t, wavelen, surrounding_refractive_index, pdf, frand(), frand());
         wi_w = mul_rotation(from_tangent, wi_t);
         vec3 wo_w = -ray.direction;
-        printf("wo_w  %f, %f, %f\n", wo_w.x, wo_w.y, wo_w.z);
-        printf("wo_t  %f, %f, %f\n", wo_t.x, wo_t.y, wo_t.z);
-        printf("wi_t  %f, %f, %f\n", wi_t.x, wi_t.y, wi_t.z);
-        printf("wi_w  %f, %f, %f\n", wi_w.x, wi_w.y, wi_w.z);
+        // printf("wo_w  %f, %f, %f\n", wo_w.x, wo_w.y, wo_w.z);
+        // printf("wo_t  %f, %f, %f\n", wo_t.x, wo_t.y, wo_t.z);
+        // printf("wi_t  %f, %f, %f\n", wi_t.x, wi_t.y, wi_t.z);
+        // printf("wi_w  %f, %f, %f\n", wi_w.x, wi_w.y, wi_w.z);
 
         // SolidXyzCurveSpectrum R = { srgb_to_xyz(vec3{0.0, 1.0, 0.0}) };
         // SolidSampledSpectrum R = { 400, 700, {0,1,1,0} };
@@ -739,7 +832,7 @@ float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index, int
     Ray next_ray = {ray.position, wi_w, 1000.0, ray.hit_object};
     float L = radiance(next_ray, wavelen, sampler, sample_index, nested+1);
 
-    printf("L %f\n", L);
+    // printf("L %f\n", L);
     // printf("absorbtion %f\n", absorbtion);
     // printf("fr %f\n", fr);
     // printf("pdf %f\n", pdf);
@@ -870,9 +963,21 @@ public:
 #include <chrono>
 int main ()
 {
-    constexpr int W = 100;
-    constexpr int H = 100;
-    constexpr int S = 1;
+
+    // vec3 wo = normalize(vec3(-1,0,-1));
+    // vec3 wi;
+    // float pdf;
+    // btdf_dielectric(wo, wi, pdf, 1.0, 1.5);
+
+    // printf("wo %f %f %f (%f)\n", wo.x, wo.y, wo.z, acosf(fabs(wo.z))/M_PI*180);
+    // printf("wi %f %f %f (%f)\n", wi.x, wi.y, wi.z, acosf(fabs(wi.z))/M_PI*180);
+
+    // return 0;
+
+
+    constexpr int W = 200;
+    constexpr int H = 200;
+    constexpr int S = 100;
     printf("Rendering %dx%d with %d samples/pixel\n", W, H, S);
     Framebuffer framebuffer(W, H);
     vec3 origin = vec3(0,.3,2);
@@ -898,7 +1003,7 @@ int main ()
 
                 Ray ray = {origin, direction, 1000.0, nullptr};
                 float L = radiance(ray, wavelen, sampler, s);
-                printf("--> L=%f\n", L);
+                // printf("--> L=%f\n", L);
                 vec3 rgb = xyz_to_linear_rgb(spectrum_sample_to_xyz(wavelen, L));
                 framebuffer.add_sample(x, y, rgb);
             }

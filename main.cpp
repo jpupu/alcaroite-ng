@@ -353,18 +353,19 @@ class Sphere : public Shape {
 public:
     bool intersect (Ray& ray, bool is_originator, bool inside_originator) const
     {
+        float a = dot(ray.direction, ray.direction);
         float b = 2 * dot(ray.origin, ray.direction);
         float c = dot(ray.origin, ray.origin) - 1.0;
-        float d = b*b - 4*c;
+        float d = b*b - 4*a*c;
 
         if (d < 0) {
             return false;
         }
 
-        // float t1 = (-b - sqrtf(d)) / 2.0;
-        // float t2 = (-b + sqrtf(d)) / 2.0;
-        float t1 = (b + sqrtf(d)) / -2.0;
-        float t2 = (b - sqrtf(d)) / -2.0;
+        // float t1 = (-b - sqrtf(d)) / (2.0 * a);
+        // float t2 = (-b + sqrtf(d)) / (2.0 * a);
+        float t1 = (b + sqrtf(d)) / (-2.0 * a);
+        float t2 = (b - sqrtf(d)) / (-2.0 * a);
 
         float t;
         if (is_originator) {
@@ -396,18 +397,19 @@ public:
 
     bool intersect (Ray& ray, bool is_originator, bool inside_originator) const
     {
+        float a = dot(ray.direction, ray.direction);
         float b = 2 * dot(ray.origin, ray.direction);
         float c = dot(ray.origin, ray.origin) - radius*radius;
-        float d = b*b - 4*c;
+        float d = b*b - 4*a*c;
 
         if (d < 0) {
             return false;
         }
 
-        // float t1 = (-b - sqrtf(d)) / 2.0;
-        // float t2 = (-b + sqrtf(d)) / 2.0;
-        float t1 = (b + sqrtf(d)) / -2.0;
-        float t2 = (b - sqrtf(d)) / -2.0;
+        // float t1 = (-b - sqrtf(d)) / (2.0 * a);
+        // float t2 = (-b + sqrtf(d)) / (2.0 * a);
+        float t1 = (b + sqrtf(d)) / (-2.0 * a);
+        float t2 = (b - sqrtf(d)) / (-2.0 * a);
 
         float t;
         if (is_originator) {

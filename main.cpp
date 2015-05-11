@@ -564,6 +564,8 @@ public:
     std::shared_ptr<Material> mat;
 
     int priority;
+
+    Transform xform; // object to world
 };
 
 
@@ -713,11 +715,12 @@ float bxdf_dielectric (const vec3& wo, vec3& wi, float& pdf, float n1, float n2)
 std::vector<GeometricObject> objects = {
     // { std::make_shared<Sphere>(), std::make_shared<TransparentSurface>(), std::make_shared<DirtyAir>(vec3(.5,.5,.5)), 10 },
     // { std::make_shared<ScaledSphere>(1.3), std::make_shared<Glass>(vec3(1.0), vec3(1.0)), std::make_shared<DirtyAir>(vec3(.995,.95,.85)), 20 },
-    { std::make_shared<ScaledSphere>(1.3), std::make_shared<Glass>(vec3(1.5), vec3(9.0,1.0,9.0)), 20 },
-    { std::make_shared<ScaledSphere>(.6), std::make_shared<Glass>(vec3(1.0), vec3(0.0,0.0,0.0)), 100 },
+    // { std::make_shared<Sphere>(), std::make_shared<PerfectMirror>(vec3(1.0)), 20, Transform::scale(vec3(.5)) },
+    { std::make_shared<Sphere>(), std::make_shared<Glass>(vec3(1.5), vec3(9.0,1.0,9.0)), 20, Transform::scale(vec3(1.3)) },
+    // { std::make_shared<ScaledSphere>(.6), std::make_shared<Glass>(vec3(1.0), vec3(0.0,0.0,0.0)), 100 },
     // { std::make_shared<Sphere>(), std::make_shared<PerfectMirror>(vec3(1.0)), std::make_shared<CleanAir>(), 100 },
     // { std::make_shared<Sphere>(), std::make_shared<Matte>(vec3(0.0,1.0,0.0)), std::make_shared<DirtyAir>(vec3(.5,.5,.5)), 10 },
-    { std::make_shared<Plane>(), std::make_shared<Matte>(vec3(.8)), 200 },
+    { std::make_shared<Plane>(), std::make_shared<Matte>(vec3(.8)), 200, Transform::translate(vec3(0,-.5,0)) * Transform::rotate_z(20) },
     // { std::make_shared<Plane>(), std::make_shared<Glass>(vec3(1.0), vec3(1.0), vec3(1.0)), 200 },
 };
 
@@ -780,12 +783,20 @@ float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index, int
     // printf("--\n");
     for (const auto& o : objects) {
         // printf("test %p, %d %d\n", &o,  ray.originator==&o, interior.has(&o));
-        if (o.shape->intersect(ray, ray.originator==&o, interior.has(&o))) {
+        Ray oray = { o.xform.inverse_point(ray.origin), o.xform.inverse_vector(ray.direction), ray.tmax, ray.originator };
+        // printf("-ray: origin %f,%f,%f, dir %f,%f,%f\n", ray.origin.x,ray.origin.y,ray.origin.z, ray.direction.x, ray.direction.y, ray.direction.z);
+        // printf("oray: origin %f,%f,%f, dir %f,%f,%f\n", oray.origin.x,oray.origin.y,oray.origin.z, oray.direction.x, oray.direction.y, oray.direction.z);
+        if (o.shape->intersect(oray, oray.originator==&o, interior.has(&o))) {
             ray.hit_object = &o;
             hit = true;
+            ray.tmax = oray.tmax;
+            ray.position = o.xform.point(oray.position);
+            ray.normal = normalize(o.xform.normal(oray.normal));
+            // printf("oray: position %f,%f,%f, normal %f,%f,%f\n", oray.position.x,oray.position.y,oray.position.z, oray.normal.x, oray.normal.y, oray.normal.z);
+            // printf("-ray: position %f,%f,%f, normal %f,%f,%f\n", ray.position.x,ray.position.y,ray.position.z, ray.normal.x, ray.normal.y, ray.normal.z);
         }
     }
-    // printf("%s %p, tmax %f, dir %f,%f,%f\n", hit?"hit":"miss",ray.hit_object, ray.tmax, ray.direction.x, ray.direction.y, ray.direction.z);
+    // printf("%s %p, tmax %f, pos %f,%f,%f, dir %f,%f,%f\n", hit?"hit":"miss",ray.hit_object, ray.tmax, ray.position.x,ray.position.y,ray.position.z, ray.direction.x, ray.direction.y, ray.direction.z);
     if (!hit) {
         // return environment(ray.direction);
         float e = environment(ray.direction);

@@ -177,6 +177,8 @@ mat34 operator* (const mat34& a, float b)
 inline
 mat34 inverse_rotation (const mat34& a)
 {
+    // http://www.mathsisfun.com/algebra/matrix-inverse-minors-cofactors-adjugate.html
+
     mat34 minors = {{
         a[5]*a[10] - a[6]*a[9],
         a[4]*a[10] - a[6]*a[8],
@@ -205,6 +207,197 @@ mat34 inverse_rotation (const mat34& a)
     float det = a[0]*minors[0] - a[1]*minors[1] + a[2]*minors[2];
 
     return adjugate * (1/det);
+}
+
+/// Inverse of a matrix consisting of rotation and translation (no scaling)
+inline
+mat34 inverse_noscale (const mat34& a)
+{
+    // http://www.cg.info.hiroshima-cu.ac.jp/~miyazaki/knowledge/teche53.html
+    // http://graphics.stanford.edu/courses/cs248-98-fall/Final/q4.html
+
+    return mat34{{
+        a[0], a[4], a[8],  -a[0]*a[3] - a[4]*a[7] - a[8]*a[11],
+        a[1], a[5], a[9],  -a[1]*a[3] - a[5]*a[7] - a[9]*a[11],
+        a[2], a[6], a[10], -a[2]*a[3] - a[6]*a[7] - a[10]*a[11],
+    }};
+}
+
+struct Transform
+{
+    mat34 M;
+    mat34 Minv;
+
+    // Transform a point.
+    vec3 point (const vec3& p) const
+    {
+        return mul(M, p);
+    }
+
+    // Transform a vector.
+    vec3 vector (const vec3& v) const
+    {
+        return mul_rotation(M, v);
+    }
+
+    // Transform a normal.
+    vec3 normal (const vec3& n) const
+    {
+        return mul_rotation_transpose(Minv, n);
+    }
+
+    // Transform a point with inverse transformation.
+    vec3 inverse_point (const vec3& p) const
+    {
+        return mul(Minv, p);
+    }
+
+    // Transform a vector with inverse transformation.
+    vec3 inverse_vector (const vec3& v) const
+    {
+        return mul_rotation(Minv, v);
+    }
+
+    // Transform a normal with inverse transformation.
+    vec3 inverse_normal (const vec3& n) const
+    {
+        return mul_rotation_transpose(M, n);
+    }
+
+    Transform inverse () const
+    {
+        return { Minv, M };
+    }
+
+    static Transform ident ()
+    {
+        return {
+            {{
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+            }},
+            {{
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+            }}
+        };
+    }
+
+    static Transform translate (const vec3& v)
+    {
+        return {
+            {{  1, 0, 0, v.x,
+                0, 1, 0, v.y,
+                0, 0, 1, v.z,
+            }},
+            {{  1, 0, 0, -v.x,
+                0, 1, 0, -v.y,
+                0, 0, 1, -v.z,
+            }}
+        };
+    }
+
+    static Transform scale (const vec3& v)
+    {
+        return {
+            {{  v.x,   0,   0, 0,
+                  0, v.y,   0, 0,
+                  0,   0, v.z, 0,
+            }},
+            {{  1/v.x,     0,     0, 0,
+                    0, 1/v.y,     0, 0,
+                    0,     0, 1/v.z, 0,
+            }}
+        };
+    }
+
+    static Transform rotate_x (float angle_deg)
+    {
+        float sin_t = sinf(angle_deg*M_PI/180);
+        float cos_t = cosf(angle_deg*M_PI/180);
+        mat34 m = {{
+            1,     0,      0, 0,
+            0, cos_t, -sin_t, 0,
+            0, sin_t,  cos_t, 0,
+        }};
+        return { m, transpose_rotation(m) };
+    }
+
+    static Transform rotate_y (float angle_deg)
+    {
+        float sin_t = sinf(angle_deg*M_PI/180);
+        float cos_t = cosf(angle_deg*M_PI/180);
+        mat34 m = {{
+             cos_t, 0, sin_t, 0,
+                 0, 1,     0, 0,
+            -sin_t, 0, cos_t, 0,
+        }};
+        return { m, transpose_rotation(m) };
+    }
+
+    static Transform rotate_z (float angle_deg)
+    {
+        float sin_t = sinf(angle_deg*M_PI/180);
+        float cos_t = cosf(angle_deg*M_PI/180);
+        mat34 m = {{
+            cos_t, -sin_t, 0, 0,
+            sin_t,  cos_t, 0, 0,
+                0,      0, 1, 0,
+        }};
+        return { m, transpose_rotation(m) };
+    }
+
+    static Transform rotate (float angle_deg, const vec3& axis)
+    {
+        float sin_t = sinf(angle_deg*M_PI/180);
+        float cos_t = cosf(angle_deg*M_PI/180);
+        vec3 a = normalize(axis);
+        mat34 m = {{
+            a.x * a.x               + (1 - a.x * a.x) * cos_t,
+            a.x * a.y * (1 - cos_t) - a.z * sin_t,
+            a.x * a.z * (1 - cos_t) + a.y * sin_t,
+            0,
+
+            a.y * a.x * (1 - cos_t) + a.z * sin_t,
+            a.y * a.y               + (1 - a.y * a.y) * cos_t,
+            a.y * a.z * (1 - cos_t) - a.x * sin_t,
+            0,
+
+            a.z * a.x * (1 - cos_t) - a.y * sin_t,
+            a.z * a.y * (1 - cos_t) + a.x * sin_t,
+            a.z * a.z               + (1 - a.z * a.z) * cos_t,
+            0,
+        }};
+        return { m, transpose_rotation(m) };
+    }
+
+    static Transform look_at (const vec3& eye, const vec3& target, const vec3& up)
+    {
+        vec3 dir = normalize(target - eye);
+        vec3 left = normalize(cross(normalize(up), dir));
+        vec3 up_ = cross(dir, left);
+        mat34 cam_to_world = {{
+            left.x, up_.x, dir.x, eye.x,
+            left.y, up_.y, dir.y, eye.y,
+            left.z, up_.z, dir.z, eye.z,
+        }};
+        return { cam_to_world, inverse_noscale(cam_to_world) };
+    }
+
+};
+
+inline
+Transform mul (const Transform& a, const Transform& b)
+{
+    return { a.M * b.M, b.Minv * a.Minv };
+}
+
+inline
+Transform operator* (const Transform& a, const Transform& b)
+{
+    return mul(a, b);
 }
 
 } // namespace pupumath_plain

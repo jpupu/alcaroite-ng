@@ -6,6 +6,10 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
+#include <cassert>
+
+using std::shared_ptr;
+using std::make_shared;
 
 enum TokenType
 {
@@ -100,14 +104,52 @@ struct Atom
 	}
 };
 
+
+struct Sexp;
+
+struct ConsCell
+{
+	shared_ptr<Sexp> a, b;
+
+	ConsCell () {}
+	ConsCell(shared_ptr<Sexp>& a, shared_ptr<Sexp>& b) : a(a), b(b) {}
+};
+
 struct Sexp
 {
-	std::unique_ptr<Atom> atom;
-	std::vector<std::unique_ptr<Sexp>> list;
+	bool is_atom;
+	shared_ptr<Atom> atom;
+	ConsCell cell;
 
-	Sexp (std::unique_ptr<Atom>&& atom) : atom(std::move(atom)) {}
-	Sexp (std::vector<std::unique_ptr<Sexp>>& list) : list(std::move(list)) {}
+	Sexp () : is_atom(true) {}
+	Sexp (shared_ptr<Atom> x) : is_atom(true), atom(x) {}
+	Sexp (shared_ptr<Sexp> x, shared_ptr<Sexp> y) : is_atom(false), cell(x,y) {}
+
+	bool nil () const
+	{
+		return is_atom && !atom;
+	}
+
 };
+
+shared_ptr<Sexp> cons (shared_ptr<Sexp> x, shared_ptr<Sexp> ys)
+{
+	assert(ys->nil() || !ys->is_atom);
+	return make_shared<Sexp>(x, ys);
+}
+
+shared_ptr<Sexp> reverse_step (const shared_ptr<Sexp>& xs, shared_ptr<Sexp> tail)
+{
+	assert(xs->nil() || !xs->is_atom);
+	if (xs->nil()) return tail;
+	return reverse_step(xs->cell.b, cons(xs->cell.a, tail));
+}
+
+shared_ptr<Sexp> reverse (const shared_ptr<Sexp>& xs)
+{
+	return reverse_step(xs, make_shared<Sexp>());
+}
+
 
 
 enum LexerState
@@ -236,17 +278,17 @@ std::vector<Token> foo (std::istream& is)
 
 // template<typename T>
 // std::unique_ptr<Sexp> extract_sexp (T& iter, const T& end)
-std::unique_ptr<Sexp> extract_sexp (std::vector<Token>::iterator& iter, const std::vector<Token>::iterator& end)
+shared_ptr<Sexp> extract_sexp (std::vector<Token>::iterator& iter, const std::vector<Token>::iterator& end)
 {
 	switch (iter->type) {
 		case T_SYMBOL:
-			return std::make_unique<Sexp>(std::make_unique<Atom>(ATOM_SYMBOL, iter->s_val));
+			return make_shared<Sexp>(make_shared<Atom>(ATOM_SYMBOL, iter->s_val));
 		case T_STRING:
-			return std::make_unique<Sexp>(std::make_unique<Atom>(ATOM_STRING, iter->s_val));
+			return make_shared<Sexp>(make_shared<Atom>(ATOM_STRING, iter->s_val));
 		case T_NUMBER:
-			return std::make_unique<Sexp>(std::make_unique<Atom>(ATOM_NUMBER, iter->n_val));
+			return make_shared<Sexp>(make_shared<Atom>(ATOM_NUMBER, iter->n_val));
 		case T_LPAREN: {
-			std::vector<std::unique_ptr<Sexp>> list;
+			auto list = make_shared<Sexp>();
 			while (true) {
 				++iter;
 				if (iter == end) {
@@ -255,48 +297,56 @@ std::unique_ptr<Sexp> extract_sexp (std::vector<Token>::iterator& iter, const st
 				if (iter->type == T_RPAREN) {
 					break;
 				}
-				list.push_back(extract_sexp(iter, end));
+				list = cons(extract_sexp(iter,end), list);
 			}
-			return std::make_unique<Sexp>(list);
+			return reverse(list);
 		}
 		case T_RPAREN:
 			throw std::runtime_error("Closing paren with no open paren");
 	}
 }
 
-void print_sexp (Sexp* sexp)
+void print_sexp (const Sexp* sexp)
 {
-	if (sexp->atom) {
-		printf("%s ", sexp->atom->repr().c_str());
+	if (sexp->nil()) {
+		printf("()");
+	}
+	else if (sexp->is_atom) {
+		printf("%s", sexp->atom->repr().c_str());
 	}
 	else {
 		printf("(");
-		for (auto& child : sexp->list) {
-			print_sexp(child.get());
-		}
-		printf(") ");
+		print_sexp(sexp->cell.a.get());
+		printf(" : ");
+		print_sexp(sexp->cell.b.get());
+		printf(")");
 	}
 }
 
-void eval_sexp (Sexp* sexp)
+shared_ptr<Sexp> eval_sexp (shared_ptr<Sexp> sexp)
 {
-	if (sexp->atom) return;
-	if (sexp->list.size() < 1) return;
-	for (auto& item : sexp->list) {
-		eval_sexp(item.get());
-	}
-	if (!sexp->list[0]->atom) return;
-	if (sexp->list[0]->atom->type != ATOM_SYMBOL) return;
-	if (sexp->list[0]->atom->s_val == "sum") {
-		float sum = 0;
-		for (auto it = ++sexp->list.begin(); it != sexp->list.end(); ++it) {
-			sum += (*it)->atom->n_val;
+	if (sexp->is_atom) return sexp;
+
+	shared_ptr<Sexp> newsexp = cons(eval_sexp(sexp->cell.a), eval_sexp(sexp->cell.b));
+
+	if (!newsexp->cell.a->is_atom) return newsexp;
+
+	if (newsexp->cell.a->atom->type != ATOM_SYMBOL) return newsexp;
+
+	if (newsexp->cell.a->atom->s_val == "pi") return make_shared<Sexp>(make_shared<Atom>(ATOM_NUMBER, 3.141592));
+
+	if (newsexp->cell.a->atom->s_val == "sum") {
+		double sum = 0.0;
+		auto cursor = newsexp->cell.b;
+		while (!cursor->nil()) {
+			sum += cursor->cell.a->atom->n_val;
+			cursor = cursor->cell.b;
 		}
-		sexp->list.clear();
-		auto tmp = std::make_unique<Atom>(ATOM_NUMBER, sum);
-		std::swap(sexp->atom, tmp);
-		// sexp->atom.reset(std::make_unique<Atom>(ATOM_NUMBER, sum));
+		return make_shared<Sexp>(make_shared<Atom>(ATOM_NUMBER, sum));
 	}
+
+	return newsexp;
+
 }
 
 
@@ -311,7 +361,7 @@ int main () {
 	auto root = extract_sexp(it, tokens.end());
 	print_sexp(root.get());
 	printf("\n");
-	eval_sexp(root.get());
+	root = eval_sexp(root);
 	print_sexp(root.get());
 	printf("\n");
 }

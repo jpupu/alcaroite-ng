@@ -66,88 +66,96 @@ public:
 
 enum AtomType
 {
+	ATOM_NIL,
 	ATOM_NUMBER,
 	ATOM_SYMBOL,
 	ATOM_STRING
 };
 
-struct Atom
+
+struct Sexp
 {
+	bool is_atom;
+
+	// Atom data.
 	AtomType type;
 	double n_val;
 	std::string s_val;
 
-	Atom (AtomType type, double val)
-		: type(type), n_val(val)
-	{
-		if (type != ATOM_NUMBER) throw std::runtime_error("not numerical");
-	}
+	// Cons cell data.
+	shared_ptr<Sexp> car, cdr;
 
-	Atom (AtomType type, const std::string& val)
-		: type(type), s_val(val)
-	{
-		if (type != ATOM_STRING && type != ATOM_SYMBOL) throw std::runtime_error("not stringal");
-	}
+	Sexp () : is_atom(true), type(ATOM_NIL) {}
+	Sexp (AtomType type, double n_val)
+		: is_atom(true), type(type), n_val(n_val) {}
+	Sexp (AtomType type, const std::string& s_val)
+		: is_atom(true), type(type), s_val(s_val) {}
+	Sexp (shared_ptr<Sexp> x, shared_ptr<Sexp> y) : is_atom(false), car(x), cdr(y) {}
+
+	bool atom () const { return is_atom; }
+	bool atom (AtomType t) const { return is_atom && type == t; }
+	bool cons_cell () const { return !is_atom; }
+	bool nil () const {	return is_atom && type == ATOM_NIL; }
+	bool proper_list_nr () const { return !is_atom || type == ATOM_NIL; }
+	bool proper_list () const { return nil() || (cons_cell() && cdr->proper_list()); }
 
 	std::string repr () const
 	{
-		switch (type) {
-			case ATOM_STRING:
-				return "\""+s_val+"\""; break;
-			case ATOM_SYMBOL:
-				return s_val; break;
+		if (nil()) return "nil";
+		else if (cons_cell()) return "(" + car->repr() + " : " + cdr->repr() + ")";
+		else switch (type) {
+			case ATOM_NIL:
+				return "nil"; break;
 			case ATOM_NUMBER:
 				return std::to_string(n_val); break;
+			case ATOM_SYMBOL:
+				return s_val; break;
+			case ATOM_STRING:
+				return "\""+s_val+"\""; break;
 			default:
 				return "<error>"; break;
 		}
 	}
 };
 
-
-struct Sexp;
-
-struct ConsCell
+shared_ptr<Sexp> new_atom (AtomType type, double val)
 {
-	shared_ptr<Sexp> a, b;
+	return make_shared<Sexp>(type, val);
+}
 
-	ConsCell () {}
-	ConsCell(shared_ptr<Sexp>& a, shared_ptr<Sexp>& b) : a(a), b(b) {}
-};
-
-struct Sexp
+shared_ptr<Sexp> new_atom (AtomType type, const std::string& val)
 {
-	bool is_atom;
-	shared_ptr<Atom> atom;
-	ConsCell cell;
+	return make_shared<Sexp>(type, val);
+}
 
-	Sexp () : is_atom(true) {}
-	Sexp (shared_ptr<Atom> x) : is_atom(true), atom(x) {}
-	Sexp (shared_ptr<Sexp> x, shared_ptr<Sexp> y) : is_atom(false), cell(x,y) {}
-
-	bool nil () const
-	{
-		return is_atom && !atom;
-	}
-
-};
-
-shared_ptr<Sexp> cons (shared_ptr<Sexp> x, shared_ptr<Sexp> ys)
+shared_ptr<Sexp> new_nil ()
 {
-	assert(ys->nil() || !ys->is_atom);
-	return make_shared<Sexp>(x, ys);
+	return make_shared<Sexp>(ATOM_NIL, 0.0);
+}
+
+shared_ptr<Sexp> new_cell (shared_ptr<Sexp> x, shared_ptr<Sexp> y)
+{
+	return make_shared<Sexp>(x, y);
+}
+
+
+shared_ptr<Sexp> cons (shared_ptr<Sexp> x, shared_ptr<Sexp> y)
+{
+	return new_cell(x, y);
 }
 
 shared_ptr<Sexp> reverse_step (const shared_ptr<Sexp>& xs, shared_ptr<Sexp> tail)
 {
-	assert(xs->nil() || !xs->is_atom);
+	assert(tail->proper_list_nr());
+	assert(xs->proper_list_nr());
 	if (xs->nil()) return tail;
-	return reverse_step(xs->cell.b, cons(xs->cell.a, tail));
+	return reverse_step(xs->cdr, cons(xs->car, tail));
 }
 
 shared_ptr<Sexp> reverse (const shared_ptr<Sexp>& xs)
 {
-	return reverse_step(xs, make_shared<Sexp>());
+	assert(xs->proper_list_nr());
+	return reverse_step(xs, new_nil());
 }
 
 
@@ -276,19 +284,18 @@ std::vector<Token> foo (std::istream& is)
 	return tokens;
 }
 
-// template<typename T>
-// std::unique_ptr<Sexp> extract_sexp (T& iter, const T& end)
+
 shared_ptr<Sexp> extract_sexp (std::vector<Token>::iterator& iter, const std::vector<Token>::iterator& end)
 {
 	switch (iter->type) {
 		case T_SYMBOL:
-			return make_shared<Sexp>(make_shared<Atom>(ATOM_SYMBOL, iter->s_val));
+			return new_atom(ATOM_SYMBOL, iter->s_val);
 		case T_STRING:
-			return make_shared<Sexp>(make_shared<Atom>(ATOM_STRING, iter->s_val));
+			return new_atom(ATOM_STRING, iter->s_val);
 		case T_NUMBER:
-			return make_shared<Sexp>(make_shared<Atom>(ATOM_NUMBER, iter->n_val));
+			return new_atom(ATOM_NUMBER, iter->n_val);
 		case T_LPAREN: {
-			auto list = make_shared<Sexp>();
+			auto list = new_nil();
 			while (true) {
 				++iter;
 				if (iter == end) {
@@ -306,47 +313,35 @@ shared_ptr<Sexp> extract_sexp (std::vector<Token>::iterator& iter, const std::ve
 	}
 }
 
-void print_sexp (const Sexp* sexp)
-{
-	if (sexp->nil()) {
-		printf("()");
-	}
-	else if (sexp->is_atom) {
-		printf("%s", sexp->atom->repr().c_str());
-	}
-	else {
-		printf("(");
-		print_sexp(sexp->cell.a.get());
-		printf(" : ");
-		print_sexp(sexp->cell.b.get());
-		printf(")");
-	}
-}
 
 shared_ptr<Sexp> eval_sexp (shared_ptr<Sexp> sexp)
 {
-	if (sexp->is_atom) return sexp;
+	if (sexp->atom()) return sexp;
 
-	shared_ptr<Sexp> newsexp = cons(eval_sexp(sexp->cell.a), eval_sexp(sexp->cell.b));
+	auto newsexp = cons(eval_sexp(sexp->car), eval_sexp(sexp->cdr));
 
-	if (!newsexp->cell.a->is_atom) return newsexp;
+	auto car = eval_sexp(sexp->car);
+	auto cdr = eval_sexp(sexp->cdr);
 
-	if (newsexp->cell.a->atom->type != ATOM_SYMBOL) return newsexp;
+	if (!car->atom() || car->type != ATOM_SYMBOL) return cons(car, cdr);
 
-	if (newsexp->cell.a->atom->s_val == "pi") return make_shared<Sexp>(make_shared<Atom>(ATOM_NUMBER, 3.141592));
+	if (car->s_val == "pi") return new_atom(ATOM_NUMBER, 3.1415916);
 
-	if (newsexp->cell.a->atom->s_val == "sum") {
+
+	if (car->s_val == "sum") {
 		double sum = 0.0;
-		auto cursor = newsexp->cell.b;
+		auto cursor = cdr;
 		while (!cursor->nil()) {
-			sum += cursor->cell.a->atom->n_val;
-			cursor = cursor->cell.b;
+			if (!cursor->cons_cell() || !cursor->car->atom(ATOM_NUMBER)) {
+				throw std::runtime_error("sum argument list must be a proper list of numbers.");
+			}
+			sum += cursor->car->n_val;
+			cursor = cursor->cdr;
 		}
-		return make_shared<Sexp>(make_shared<Atom>(ATOM_NUMBER, sum));
+		return new_atom(ATOM_NUMBER, sum);
 	}
 
-	return newsexp;
-
+	return cons(car, cdr);
 }
 
 
@@ -359,10 +354,10 @@ int main () {
 
 	auto it = tokens.begin();
 	auto root = extract_sexp(it, tokens.end());
-	print_sexp(root.get());
+	printf("%s\n", root->repr().c_str());
 	printf("\n");
 	root = eval_sexp(root);
-	print_sexp(root.get());
+	printf("%s\n", root->repr().c_str());
 	printf("\n");
 }
 

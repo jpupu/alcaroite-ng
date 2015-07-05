@@ -117,7 +117,55 @@ struct Sexp
 				return "<error>"; break;
 		}
 	}
+
+
+	friend std::ostream& operator<< (std::ostream&, const shared_ptr<Sexp>&);
+
+	void print_dotted (std::ostream& stream) const
+	{
+		assert(cons_cell());
+
+		stream << car;
+
+		if (cdr->nil()) {
+			stream << ')';
+		}
+		else if (cdr->atom()) {
+			stream << " . " << cdr << ')';
+		}
+		else {
+			stream << ' ';
+			cdr->print_dotted(stream);
+		}
+	}
+
+	void print (std::ostream& stream) const
+	{
+		if (cons_cell()) {
+			stream << "(";
+			print_dotted(stream);
+		}
+		else switch (type) {
+			case ATOM_NIL:
+				stream << "nil"; break;
+			case ATOM_NUMBER:
+				stream << std::to_string(n_val); break;
+			case ATOM_SYMBOL:
+				stream << s_val; break;
+			case ATOM_STRING:
+				stream << "\""+s_val+"\""; break;
+			default:
+				stream << "<error>"; break;
+		}
+		
+	}
 };
+
+std::ostream& operator<< (std::ostream& stream, const shared_ptr<Sexp>& sexp)
+{
+	sexp->print(stream);
+	return stream;
+}
 
 shared_ptr<Sexp> new_atom (AtomType type, double val)
 {
@@ -460,11 +508,9 @@ int main () {
 
 	auto it = tokens.begin();
 	auto root = extract_sexp(it, tokens.end());
-	printf("%s\n", root->repr().c_str());
-	printf("\n");
+	std::cout << root << std::endl << std::endl;
 	auto evaluator = Evaluator();
 	root = evaluator.eval_program(root);
-	printf("%s\n", root->repr().c_str());
-	printf("\n");
+	std::cout << root << std::endl;
 }
 

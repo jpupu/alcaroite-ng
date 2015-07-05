@@ -1,6 +1,7 @@
 #include <cctype>
 #include <cstdio>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <string>
 #include <stdexcept>
@@ -96,7 +97,7 @@ struct Sexp
 	bool atom (AtomType t) const { return is_atom && type == t; }
 	bool cons_cell () const { return !is_atom; }
 	bool nil () const {	return is_atom && type == ATOM_NIL; }
-	bool proper_list_nr () const { return !is_atom || type == ATOM_NIL; }
+	bool list () const { return !is_atom || type == ATOM_NIL; }
 	bool proper_list () const { return nil() || (cons_cell() && cdr->proper_list()); }
 
 	std::string repr () const
@@ -144,17 +145,40 @@ shared_ptr<Sexp> cons (shared_ptr<Sexp> x, shared_ptr<Sexp> y)
 	return new_cell(x, y);
 }
 
+shared_ptr<Sexp> car (shared_ptr<Sexp> x) { assert(x->cons_cell()); return x->car; }
+shared_ptr<Sexp> cdr (shared_ptr<Sexp> x) { assert(x->cons_cell()); return x->cdr; }
+shared_ptr<Sexp> caar (shared_ptr<Sexp> x) { assert(x->cons_cell()); return car(car(x)); }
+shared_ptr<Sexp> cadr (shared_ptr<Sexp> x) { assert(x->cons_cell()); return car(cdr(x)); }
+shared_ptr<Sexp> cdar (shared_ptr<Sexp> x) { assert(x->cons_cell()); return cdr(car(x)); }
+shared_ptr<Sexp> cddr (shared_ptr<Sexp> x) { assert(x->cons_cell()); return cdr(cdr(x)); }
+shared_ptr<Sexp> caaar (shared_ptr<Sexp> x) { assert(x->cons_cell()); return car(car(car(x))); }
+shared_ptr<Sexp> caadr (shared_ptr<Sexp> x) { assert(x->cons_cell()); return car(car(cdr(x))); }
+shared_ptr<Sexp> cadar (shared_ptr<Sexp> x) { assert(x->cons_cell()); return car(cdr(car(x))); }
+shared_ptr<Sexp> caddr (shared_ptr<Sexp> x) { assert(x->cons_cell()); return car(cdr(cdr(x))); }
+shared_ptr<Sexp> cdaar (shared_ptr<Sexp> x) { assert(x->cons_cell()); return cdr(car(car(x))); }
+shared_ptr<Sexp> cdadr (shared_ptr<Sexp> x) { assert(x->cons_cell()); return cdr(car(cdr(x))); }
+shared_ptr<Sexp> cddar (shared_ptr<Sexp> x) { assert(x->cons_cell()); return cdr(cdr(car(x))); }
+shared_ptr<Sexp> cdddr (shared_ptr<Sexp> x) { assert(x->cons_cell()); return cdr(cdr(cdr(x))); }
+
+int list_size (shared_ptr<Sexp> xs)
+{
+	assert(xs->list());
+	if (xs->nil()) return 0;
+	if (xs->cdr->atom() && !xs->cdr->nil()) return 2;
+	return 1 + list_size(xs->cdr);
+}
+
 shared_ptr<Sexp> reverse_step (const shared_ptr<Sexp>& xs, shared_ptr<Sexp> tail)
 {
-	assert(tail->proper_list_nr());
-	assert(xs->proper_list_nr());
+	assert(tail->proper_list());
+	assert(xs->proper_list());
 	if (xs->nil()) return tail;
 	return reverse_step(xs->cdr, cons(xs->car, tail));
 }
 
 shared_ptr<Sexp> reverse (const shared_ptr<Sexp>& xs)
 {
-	assert(xs->proper_list_nr());
+	assert(xs->proper_list());
 	return reverse_step(xs, new_nil());
 }
 
@@ -314,35 +338,117 @@ shared_ptr<Sexp> extract_sexp (std::vector<Token>::iterator& iter, const std::ve
 }
 
 
-shared_ptr<Sexp> eval_sexp (shared_ptr<Sexp> sexp)
+
+class Evaluator 
 {
-	if (sexp->atom()) return sexp;
+	std::map<std::string, shared_ptr<Sexp>> variables;
 
-	auto newsexp = cons(eval_sexp(sexp->car), eval_sexp(sexp->cdr));
-
-	auto car = eval_sexp(sexp->car);
-	auto cdr = eval_sexp(sexp->cdr);
-
-	if (!car->atom() || car->type != ATOM_SYMBOL) return cons(car, cdr);
-
-	if (car->s_val == "pi") return new_atom(ATOM_NUMBER, 3.1415916);
-
-
-	if (car->s_val == "sum") {
-		double sum = 0.0;
-		auto cursor = cdr;
-		while (!cursor->nil()) {
-			if (!cursor->cons_cell() || !cursor->car->atom(ATOM_NUMBER)) {
-				throw std::runtime_error("sum argument list must be a proper list of numbers.");
-			}
-			sum += cursor->car->n_val;
-			cursor = cursor->cdr;
+	shared_ptr<Sexp> lookup_variable (const std::string& name)
+	{
+		auto it = variables.find(name);
+		if (it == variables.end()) {
+			throw std::runtime_error(std::string("no such symbol: ") + name);
 		}
-		return new_atom(ATOM_NUMBER, sum);
+		return it->second;
 	}
 
-	return cons(car, cdr);
-}
+public:
+	shared_ptr<Sexp> eval_program (shared_ptr<Sexp> sexp)
+	{
+		auto result = new_nil();
+		auto cursor = sexp;
+
+		while (!cursor->nil()) {
+			if (cursor->atom()) {
+				result = cons(eval(cursor), result);
+				break;
+			}
+			result = cons(eval(cursor->car), result);
+			cursor = cursor->cdr; 
+		}
+		return reverse(result);
+	}
+
+	shared_ptr<Sexp> eval (shared_ptr<Sexp> sexp)
+	{
+		if (sexp->atom()) {
+			if (sexp->type == ATOM_SYMBOL) {
+				return lookup_variable(sexp->s_val);
+			}
+			else {
+				return sexp;
+			}
+		}
+
+		assert(sexp->proper_list());
+
+		if (sexp->car->atom(ATOM_SYMBOL)) {
+			auto syntax = sexp->car->s_val;
+
+			if (syntax == "define") {
+				if (!cadr(sexp)->atom(ATOM_SYMBOL)) {
+					throw std::runtime_error("attempting to define non-symbol");
+				}
+				if (!cdddr(sexp)->nil()) {
+					throw std::runtime_error("define takes single value");
+				}
+				auto sym = cadr(sexp)->s_val;
+				if (variables.find(sym) != variables.end()) {
+					throw std::runtime_error("cannot re-define symbol");
+				}
+				variables[sym] = eval(caddr(sexp));
+				return new_nil();
+			}
+
+			if (syntax == "quote") {
+				if (cdr(sexp)->nil() || !cddr(sexp)->nil()) {
+					throw std::runtime_error("bad quote form");
+				}
+				return cadr(sexp);
+			}
+
+			if (syntax == "if") {
+				auto args = cdr(sexp);
+				if (list_size(args) != 3) {
+					throw std::runtime_error("if-form takes 3 arguments");
+				}
+				auto test = eval(car(args));
+				if (test->nil() || (test->atom(ATOM_NUMBER) && test->n_val == 0)) {
+					// Test evaluates to FALSE
+					return eval(caddr(args));
+				}
+				else {
+					// Test evaluates to TRUE.
+					return  eval(cadr(args));
+				}
+			}
+		}
+
+		// Function call
+		if (!sexp->car->atom(ATOM_SYMBOL)) {
+			throw std::runtime_error("Function name must be a symbol!");
+		}
+		auto name = car(sexp)->s_val;
+		auto args = eval_program(cdr(sexp));
+
+		if (name == "sum") {
+			double sum = 0.0;
+			auto cursor = args;
+			while (!cursor->nil()) {
+				if (!cursor->cons_cell() || !cursor->car->atom(ATOM_NUMBER)) {
+					throw std::runtime_error("sum argument list must be a proper list of numbers.");
+				}
+				sum += cursor->car->n_val;
+				cursor = cursor->cdr;
+			}
+			return new_atom(ATOM_NUMBER, sum);
+
+		}
+
+		throw std::runtime_error(std::string("undefined function: ") + sexp->car->repr());
+	}
+};
+
 
 
 int main () {
@@ -356,7 +462,8 @@ int main () {
 	auto root = extract_sexp(it, tokens.end());
 	printf("%s\n", root->repr().c_str());
 	printf("\n");
-	root = eval_sexp(root);
+	auto evaluator = Evaluator();
+	root = evaluator.eval_program(root);
 	printf("%s\n", root->repr().c_str());
 	printf("\n");
 }

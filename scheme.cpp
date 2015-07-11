@@ -35,10 +35,9 @@ struct Object
 
 protected:
     Object (TypeTag type) : type(type) {}
-    virtual ~Object () {}
 };
 
-struct Pair : public Object
+struct Pair : Object
 {
     Pair (shared_ptr<Object> car, shared_ptr<Object> cdr)
         : Object(pair_type), car(car), cdr(cdr) {}
@@ -46,25 +45,25 @@ struct Pair : public Object
     shared_ptr<Object> cdr;
 };
 
-struct String : public Object
+struct String : Object
 {
     String (const std::string& v) : Object(string_type), value(v) {}
     std::string value;
 };
 
-struct Symbol : public Object
+struct Symbol : Object
 {
     Symbol (const std::string& v) : Object(symbol_type), value(v) {}
     const std::string value;
 };
 
-struct Number : public Object
+struct Number : Object
 {
     Number (double v) : Object(number_type), value(v) {}
     const double value;
 };
 
-struct Nil : public Object
+struct Nil : Object
 {
     Nil () : Object(nil_type) {}
 };
@@ -133,7 +132,7 @@ void print_tail (std::ostream& stream, const shared_ptr<Pair>& obj, bool initial
     }
     else if (obj->cdr->type == Object::pair_type) {
         stream << ' ';
-        print_tail(stream, std::dynamic_pointer_cast<Pair>(obj->cdr));
+        print_tail(stream, std::static_pointer_cast<Pair>(obj->cdr));
     }
     else {
         stream << " . ";
@@ -147,28 +146,28 @@ void print (std::ostream& stream, const shared_ptr<Object>& obj)
 {
     switch (obj->type) {
         case Object::pair_type: {
-            auto o = std::dynamic_pointer_cast<Pair>(obj);
+            auto o = std::static_pointer_cast<Pair>(obj);
             print_tail(stream, o, true);
             // stream << '(' << o->car << " . " << o->cdr << ')';
             break;
         }
         case Object::symbol_type: {
-            auto o = std::dynamic_pointer_cast<Symbol>(obj);
+            auto o = std::static_pointer_cast<Symbol>(obj);
             stream << o->value;
             break;
         }
         case Object::number_type: {
-            auto o = std::dynamic_pointer_cast<Number>(obj);
+            auto o = std::static_pointer_cast<Number>(obj);
             stream << o->value;
             break;
         }
         case Object::string_type: {
-            auto o = std::dynamic_pointer_cast<String>(obj);
+            auto o = std::static_pointer_cast<String>(obj);
             stream << o->value;
             break;
         }
         case Object::nil_type: {
-            auto o = std::dynamic_pointer_cast<Nil>(obj);
+            auto o = std::static_pointer_cast<Nil>(obj);
             stream << "'()";
             break;
         }

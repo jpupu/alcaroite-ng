@@ -56,7 +56,7 @@ Token scan (std::istream& is)
 
     while (true) {
         int c = is.get();
-        printf("%d: %d %c\n", state, c, c);
+        // printf("%d: %d %c\n", state, c, c);
 
         switch (state) {
             case S_START:

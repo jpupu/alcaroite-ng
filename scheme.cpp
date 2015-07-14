@@ -334,7 +334,7 @@ Object* read_list (GarbageCollector& gc)
     return make_object<Pair>(gc, read(gc, tok), read_list(gc));
 }
 
-/// Reads syntax datum and returns object.
+/// Reads syntax datum and returns a datum.
 Object* read (GarbageCollector& gc)
 {
     return read(gc, scan(std::cin));
@@ -343,16 +343,62 @@ Object* read (GarbageCollector& gc)
 
 std::map<std::string, Object*> variable_bindings;
 
-// Object* evaluate (GarbageCollector& gc, Object* obj)
-// {
-//     if (obj->type != Object::pair_type) {
-//         return obj;
-//     }
+Object* evaluate (GarbageCollector& gc, Object* form);
 
-//     auto p = static_cast<Pair*>(obj);
-//     if (std::string("define") == as<Symbol>(p->car)->data) {} 
-//     if (std::string("define") == as_symbol(p->car)->data) {} 
-// }
+
+Object* special_form_define (GarbageCollector& gc, Object* args)
+{
+    if (args->type != Object::pair_type) {
+        throw std::runtime_error("invalid `define' form (1st arg)");
+    }
+    auto pair1 = static_cast<Pair*>(args);
+
+    if (pair1->cdr->type != Object::pair_type) {
+        throw std::runtime_error("invalid `define' form (2nd arg)");
+    }
+    auto pair2 = static_cast<Pair*>(pair1->cdr);
+
+    if (pair2->cdr != nil_constant) {
+        throw std::runtime_error("invalid `define' form (3rd arg)");
+    }
+
+    if (pair1->car->type != Object::symbol_type) {
+        throw std::runtime_error("invalid `define' form (variable is not symbol)");        
+    }
+    auto name = std::string(static_cast<Symbol*>(pair1->car)->data);
+
+    if (variable_bindings.find(name) != variable_bindings.end()) {
+        throw std::runtime_error("variable already defined");
+    }
+
+    auto value = evaluate(gc, pair2->car);
+    variable_bindings[name] = value;
+    gc.add_root_pointer(reinterpret_cast<Object**>(&variable_bindings[name]));
+    return make_object<String>(gc, 3, "non");
+}
+
+Object* evaluate (GarbageCollector& gc, Object* form)
+{
+    if (form->type == Object::symbol_type) {
+        auto name = std::string(static_cast<String*>(form)->data);
+        auto it = variable_bindings.find(name);
+        if (it == variable_bindings.end()) {
+            throw std::runtime_error("variable not bound");
+        }
+        return it->second;
+    }
+    if (form->type != Object::pair_type) {
+        return form;
+    }
+
+    auto p = static_cast<Pair*>(form);
+
+    // Check for syntax.
+    if (p->car->type == Object::symbol_type) {
+        auto name = std::string(static_cast<String*>(p->car)->data);
+        if (name == "define") { return special_form_define(gc, p->cdr); }
+    }
+}
 
 
 void print (std::ostream& stream, const Object* obj);
@@ -424,31 +470,24 @@ int main (int argc, char* argv[])
     std::cout << "Nil     size "<<sizeof(Nil)<<" align "<< alignof(Nil) << std::endl;
 
 
-    GarbageCollector gc(200);
+    GarbageCollector gc(300);
     nil_constant = make_object<Nil>(gc);
     gc.add_root_pointer(reinterpret_cast<Object**>(&nil_constant));
-    std::vector<Object*> results;
-    results.reserve(100);
 
     Pair* loop1 = make_object<Pair>(gc, nil_constant, nil_constant);
     Pair* loop2 = make_object<Pair>(gc, loop1, nil_constant);
     loop1->car = loop2;
     gc.add_root_pointer(reinterpret_cast<Object**>(&loop1));
 
+    variable_bindings["pi"] = make_object<Number>(gc, 3.141592);
+    gc.add_root_pointer(reinterpret_cast<Object**>(&variable_bindings["pi"]));
+
     while (true) {
         std::cout << "> ";
-        auto x = read(gc);
+        auto x = evaluate(gc, read(gc));
         std::cout << "==> " << x << std::endl;
         if (x->type == Object::nil_type) break;
-
-        x = make_object<String>(gc, 10, (std::string("result...")+std::to_string(results.size())).c_str());
-        results.push_back(x);
-        gc.add_root_pointer(reinterpret_cast<Object**>(&results.back()));
     } 
-
-    for (auto o : results) {
-        std::cout << "RESULT: " << o << '\n';
-    }
 
     // while (true) {
     //     Token tok = scan(std::cin);

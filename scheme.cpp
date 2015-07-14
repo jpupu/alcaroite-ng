@@ -271,19 +271,24 @@ public:
         // Move point so it's properly aligned.
         point += alignment - 1 - (point - 1) % alignment;
         
-        // Collect garbage if not enough capacity.
+        // If capacity is still insufficient, we're SOL.
         if (point + size >= generic_pool.capacity()) {
-            collect();
-    
-            point = generic_pool.size();
-            // Move point so it's properly aligned.
-            point += alignment - 1 - (point - 1) % alignment;
-    
-            // If capacity is still insufficient, we're SOL.
-            if (point + size >= generic_pool.capacity()) {
-                throw std::runtime_error("GC: out of memory");
-            }
+            throw std::runtime_error("GC: out of memory");
         }
+
+        // // Collect garbage if not enough capacity.
+        // if (point + size >= generic_pool.capacity()) {
+        //     collect();
+    
+        //     point = generic_pool.size();
+        //     // Move point so it's properly aligned.
+        //     point += alignment - 1 - (point - 1) % alignment;
+    
+        //     // If capacity is still insufficient, we're SOL.
+        //     if (point + size >= generic_pool.capacity()) {
+        //         throw std::runtime_error("GC: out of memory");
+        //     }
+        // }
 
         std::cout << "GC: allocated at point " << point << " @ " << static_cast<void*>(generic_pool.data() + point) << '\n';
 
@@ -487,6 +492,7 @@ int main (int argc, char* argv[])
         auto x = evaluate(gc, read(gc));
         std::cout << "==> " << x << std::endl;
         if (x->type == Object::nil_type) break;
+        gc.collect();
     } 
 
     // while (true) {

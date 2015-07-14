@@ -1,6 +1,8 @@
 #include "lexer.hpp"
 
+#include <algorithm>
 #include <exception>
+#include <map>
 #include <memory>
 #include <vector>
 
@@ -22,6 +24,8 @@ using std::make_shared;
 // };
 
 
+constexpr size_t OBJECT_ALIGNMENT = 8;
+
 
 struct Object
 {
@@ -33,9 +37,10 @@ struct Object
         nil_type,
     };
     TypeTag type;
+    bool gc_mark;
 
 protected:
-    Object (TypeTag type) : type(type) {}
+    Object (TypeTag type) : type(type), gc_mark(false) {}
 };
 
 struct Pair : Object
@@ -96,6 +101,28 @@ struct Nil : Object
     static size_t total_size () { return sizeof(Nil); }
 };
 
+
+
+size_t object_sizeof (const Object* obj)
+{
+    switch (obj->type) {
+        case Object::pair_type: return sizeof(Pair);
+        case Object::symbol_type:
+            return sizeof(Symbol) + static_cast<const Symbol*>(obj)->len + 1;
+        case Object::string_type:
+            return sizeof(String) + static_cast<const String*>(obj)->len + 1;
+        case Object::number_type: return sizeof(Number);
+        case Object::nil_type: return sizeof(Nil);
+    }
+}
+
+template<typename T>
+T* object_align (const T* ptr)
+{
+    auto p = reinterpret_cast<size_t>(ptr);
+    return reinterpret_cast<T*>(p + OBJECT_ALIGNMENT - 1 - (p - 1) % OBJECT_ALIGNMENT); 
+}
+
 // shared_ptr<Nil> nil_constant = make_shared<Nil>();
 
 // struct Value
@@ -119,31 +146,121 @@ class GarbageCollector
 {
 private:
     std::vector<char> generic_pool;
-    // std::vector<Pair> pair_pool;
+
+    std::vector<Object**> root_pointers;
+
+private:
+    void mark_object_recursive (Object* obj)
+    {
+        std::cout << "GC: mark " << obj << std::endl;
+        if (obj->gc_mark) {
+            std::cout << "GC: loop detected\n";
+            return;
+        }
+        obj->gc_mark = true;
+
+        if (obj->type == Object::pair_type) {
+            auto p = static_cast<Pair*>(obj);
+            mark_object_recursive(p->car);
+            mark_object_recursive(p->cdr);
+        }
+    }
+
+    void update_object_recursive (Object* obj, const std::map<Object*, Object*>& moves)
+    {
+        std::cout << "GC: update " << obj << std::endl;
+        if (!obj->gc_mark) {
+            std::cout << "GC: loop detected\n";
+            return;
+        }
+        obj->gc_mark = false;
+
+        if (obj->type == Object::pair_type) {
+            auto p = static_cast<Pair*>(obj);
+
+            auto it = moves.find(p->car);
+            if (it != moves.end()) { p->car = it->second; }
+            it = moves.find(p->cdr);
+            if (it != moves.end()) { p->cdr = it->second; }
+
+            update_object_recursive(p->car, moves);
+            update_object_recursive(p->cdr, moves);
+        }
+    }
+
 
 public:
     /// Sizes are given in bytes.
-    GarbageCollector (size_t pair_pool_size, size_t generic_pool_size)
+    GarbageCollector (size_t generic_pool_size)
     {
         generic_pool.reserve(generic_pool_size);
-        // pair_pool.reserve(pair_pool_size / sizeof(Pair));
     }
 
-    // Pair* new_pair (Object* car, Object* cdr)
-    // {
-    //     if (pair_pool.size() == pair_pool.capacity()) {
-    //         collect();
-    //         if (pair_pool.size() == pair_pool.capacity()) {
-    //             throw std::runtime_error("GC: pair pool full!");
-    //         }
-    //     }
-    //     pair_pool.emplace_back(car, cdr);
-    //     return &pair_pool.back();
-    // }
+    void add_root_pointer (Object** pointer)
+    {
+        std::cout << "add " << pointer<<"->"<<*pointer << std::endl;
+        root_pointers.push_back(pointer);
+    }
+
+    void remove_root_pointer (Object** pointer)
+    {
+        root_pointers.erase(std::remove(root_pointers.begin(),
+                                        root_pointers.end(),
+                                        pointer));
+    }
+
 
     void collect ()
     {
-        // TODO
+        std::cout << "GC: collection started\n";
+
+        // Mark.
+        for(int i = 0; i < root_pointers.size(); i++)
+        {
+            std::cout << "***" << i << "  " << root_pointers[i] << " -> " << (*root_pointers[i]) << '\n';
+        }
+        for (auto it : root_pointers) {
+            mark_object_recursive(*it);
+        }
+
+        // Sweep.
+        char* point = generic_pool.data();
+        char* limit = point + generic_pool.size();
+        char* new_limit = point;
+        std::map<Object*, Object*> moves;
+        while (point < limit) {
+            auto o = reinterpret_cast<Object*>(point);
+            size_t size = object_sizeof(o);
+
+            std::cout << "GC: check " << o << " type: " << o->type << std::endl;
+
+            if (!o->gc_mark) {
+                std::cout << "GC:   remove " << o << std::endl;
+            }
+            else {
+                // move if needed.
+                if (new_limit != point) {
+                    std::cout << "GC:   move -> " << new_limit << std::endl;
+                    memmove(new_limit, point, size);
+                    moves[o] = reinterpret_cast<Object*>(new_limit);
+                }
+                new_limit = object_align(new_limit + size);
+            }
+            point = object_align(point + size);
+        }
+        generic_pool.resize(new_limit - generic_pool.data());
+        std::cout << "GC: new size " << generic_pool.size() << std::endl;
+
+        // Update pointers.
+        if (!moves.empty()) {
+            for (auto it : root_pointers) {
+                auto move_it = moves.find(*it);
+                if (move_it != moves.end()) { *it = move_it->second; }
+                update_object_recursive(*it, moves);
+            }
+        }
+
+        std::cout << "GC: collection ended\n";
     }
 
     void* allocate (size_t alignment, size_t size)
@@ -157,89 +274,37 @@ public:
         // Collect garbage if not enough capacity.
         if (point + size >= generic_pool.capacity()) {
             collect();
-
+    
+            point = generic_pool.size();
+            // Move point so it's properly aligned.
+            point += alignment - 1 - (point - 1) % alignment;
+    
             // If capacity is still insufficient, we're SOL.
             if (point + size >= generic_pool.capacity()) {
                 throw std::runtime_error("GC: out of memory");
             }
         }
 
+        std::cout << "GC: allocated at point " << point << " @ " << static_cast<void*>(generic_pool.data() + point) << '\n';
+
         // We have capacity, so allocate the memory.
         generic_pool.resize(point + size);
         return static_cast<void*>(generic_pool.data() + point);
     }
-
-    // template<class T, class... Args>
-    // T* make_object (Args&&... args)
-    // {
-    //     T* ptr = static_cast<T*>(allocate(alignof(T),
-    //         T::total_size(std::forward<Args>(args));
-    //     return new(ptr) T(std::forward<Args>(args));
-    // }
-
-    // Pair* make_pair (Object* car, Object* cdr)
-    // {
-    //     auto p = static_cast<Pair*>(allocate(alignof(Pair), sizeof(Pair)));
-    //     p->car = car;
-    //     p->cdr = cdr;
-    //     return p;
-    // }
-
-    // String* make_string (const std::string& s)
-    // {
-    //     auto p = static_cast<String*>(allocate(alignof(String), sizeof(String + s.size())));
-    //     p.len = s.size();
-    //     memcpy(p.data, s.c_str(), s.size());
-    //     return p;
-    // }
-
-    // Number* make_number (double v)
-    // {
-    //     auto p = static_cast<Number*>(allocate(alignof(Number), sizeof(Number)));
-    //     p->value = v;
-    //     return p;
-    // }
-
-
-// template<class T, class... U>
-// std::unique_ptr<T> make_unique(U&&... u)
-// {
-//     return std::unique_ptr<T>(new T(std::forward<U>(u)...));
-// }
-
 };
+
 
 template<class T, class... Args>
 T* make_object (GarbageCollector& gc, Args&&... args)
 {
     size_t size = T::total_size(std::forward<Args>(args)...);
-    void* ptr = gc.allocate(alignof(T), size);
-    // T* ptr = static_cast<T*>(gc.allocate(alignof(T), size));
-        // T::total_size(std::forward<Args>(args))));
+    // void* ptr = gc.allocate(alignof(T), size);
+    void* ptr = gc.allocate(OBJECT_ALIGNMENT, size);
     return new(ptr) T(std::forward<Args>(args)...);
 }
 
 Nil* nil_constant = nullptr;
 
-// template<class T>
-// T* allocate<T> ()
-// {
-//     // FIXME: take alignment into account!!
-//     if (generic_pool.size() + size >= generic_pool.capacity()) {
-//         collect();
-//         if (generic_pool.size() + size >= generic_pool.capacity()) {
-//             throw std::runtime_error("GC: out of memory");
-//         }
-//     }
-
-//     return static_cast<T*>(generic_pool.back()
-// }
-
-// template<class T, class... Args>
-// shared_ptr<T> make_object (GarbageCollector& gc, Args&&... args)
-// {
-//     gc.reserve<T>(sizeof(T));
-// }
 
 
 Object* read_list (GarbageCollector&);
@@ -274,6 +339,21 @@ Object* read (GarbageCollector& gc)
 {
     return read(gc, scan(std::cin));
 }
+
+
+std::map<std::string, Object*> variable_bindings;
+
+// Object* evaluate (GarbageCollector& gc, Object* obj)
+// {
+//     if (obj->type != Object::pair_type) {
+//         return obj;
+//     }
+
+//     auto p = static_cast<Pair*>(obj);
+//     if (std::string("define") == as<Symbol>(p->car)->data) {} 
+//     if (std::string("define") == as_symbol(p->car)->data) {} 
+// }
+
 
 void print (std::ostream& stream, const Object* obj);
 
@@ -337,11 +417,39 @@ std::ostream& operator<< (std::ostream& stream, const Object* obj)
 
 int main (int argc, char* argv[])
 {
-    GarbageCollector gc(10000, 10000);
+    std::cout << "Pair    size "<<sizeof(Pair)<<" align "<< alignof(Pair) << std::endl;
+    std::cout << "Symbol  size "<<sizeof(Symbol)<<" align "<< alignof(Symbol) << std::endl;
+    std::cout << "Number  size "<<sizeof(Number)<<" align "<< alignof(Number) << std::endl;
+    std::cout << "String  size "<<sizeof(String)<<" align "<< alignof(String) << std::endl;
+    std::cout << "Nil     size "<<sizeof(Nil)<<" align "<< alignof(Nil) << std::endl;
+
+
+    GarbageCollector gc(200);
     nil_constant = make_object<Nil>(gc);
-    std::cout << "> ";
-    auto x = read(gc);
-    std::cout << "==> " << x << std::endl; 
+    gc.add_root_pointer(reinterpret_cast<Object**>(&nil_constant));
+    std::vector<Object*> results;
+    results.reserve(100);
+
+    Pair* loop1 = make_object<Pair>(gc, nil_constant, nil_constant);
+    Pair* loop2 = make_object<Pair>(gc, loop1, nil_constant);
+    loop1->car = loop2;
+    gc.add_root_pointer(reinterpret_cast<Object**>(&loop1));
+
+    while (true) {
+        std::cout << "> ";
+        auto x = read(gc);
+        std::cout << "==> " << x << std::endl;
+        if (x->type == Object::nil_type) break;
+
+        x = make_object<String>(gc, 10, (std::string("result...")+std::to_string(results.size())).c_str());
+        results.push_back(x);
+        gc.add_root_pointer(reinterpret_cast<Object**>(&results.back()));
+    } 
+
+    for (auto o : results) {
+        std::cout << "RESULT: " << o << '\n';
+    }
+
     // while (true) {
     //     Token tok = scan(std::cin);
     //     std::cout << "Read token: " << tok.repr() << std::endl;

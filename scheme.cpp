@@ -301,19 +301,19 @@ public:
 };
 
 
-struct Constants {
-private:
-    std::unique_ptr<Nil> uniq_nil;
+namespace consts {
+    template<typename T>
+    struct automatic_ptr {
+        std::unique_ptr<T> ptr;
+        automatic_ptr () : ptr(new T()) {}
+        operator T* () { return ptr.get(); }
+    };
 
-public:
-    Nil* nil;
+   automatic_ptr<Nil> nil;
+};
 
-    Constants ()
-        : uniq_nil(new Nil()),
-        nil(uniq_nil.get())
-    {}
-} consts;
 GarbageCollector gc(1000);
+
 
 template<class T, class... Args>
 T* make_object (Args&&... args)
@@ -335,7 +335,7 @@ Object* read (const Token& tok)
         case T_LPAREN: return read_list();
         case T_RPAREN:
             throw std::runtime_error("unexpected closing paren");
-        case T_EOF: return consts.nil; // FIXME
+        case T_EOF: return consts::nil; // FIXME
     }
 }
 
@@ -343,7 +343,7 @@ Object* read_list ()
 {
     Token tok = scan(std::cin);
     if (tok.type == T_RPAREN) {
-        return consts.nil;
+        return consts::nil;
     }
     else if (tok.type == T_EOF) {
         throw;
@@ -381,7 +381,7 @@ public:
         }
         auto pair2 = static_cast<Pair*>(pair1->cdr);
 
-        if (pair2->cdr != consts.nil) {
+        if (pair2->cdr != consts::nil) {
             throw std::runtime_error("invalid `define' form (3rd arg)");
         }
 
@@ -433,7 +433,7 @@ void print_tail (std::ostream& stream, const Pair* obj, bool initial = false)
 {
     if (initial) { stream << '('; }
     print(stream, obj->car);
-    if (obj->cdr == consts.nil) {
+    if (obj->cdr == consts::nil) {
         stream << ')';
     }
     else if (obj->cdr->type == Object::pair_type) {
@@ -498,7 +498,7 @@ int main (int argc, char* argv[])
         std::cout << "> ";
         auto x = sc.evaluate(read());
         std::cout << "==> " << x << std::endl;
-        if (x == consts.nil) break;
+        if (x == consts::nil) break;
         gc.collect();
     } 
 

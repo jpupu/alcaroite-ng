@@ -24,6 +24,8 @@ using std::make_shared;
 // };
 
 
+namespace scheme_ns {
+
 constexpr size_t OBJECT_ALIGNMENT = 8;
 
 
@@ -299,8 +301,22 @@ public:
 };
 
 
+struct Constants {
+private:
+    std::unique_ptr<Nil> uniq_nil;
+
+public:
+    Nil* nil;
+
+    Constants ()
+        : uniq_nil(new Nil()),
+        nil(uniq_nil.get())
+    {}
+} consts;
+GarbageCollector gc(1000);
+
 template<class T, class... Args>
-T* make_object (GarbageCollector& gc, Args&&... args)
+T* make_object (Args&&... args)
 {
     size_t size = T::total_size(std::forward<Args>(args)...);
     // void* ptr = gc.allocate(alignof(T), size);
@@ -308,103 +324,107 @@ T* make_object (GarbageCollector& gc, Args&&... args)
     return new(ptr) T(std::forward<Args>(args)...);
 }
 
-Nil* nil_constant = nullptr;
+Object* read_list ();
 
-
-
-Object* read_list (GarbageCollector&);
-
-Object* read (GarbageCollector& gc, const Token& tok)
+Object* read (const Token& tok)
 {
     switch (tok.type) {
-        case T_STRING: return make_object<String>(gc, tok.s_val.size(), tok.s_val.data());
-        case T_IDENTIFIER: return make_object<Symbol>(gc, tok.s_val.size(), tok.s_val.data());
-        case T_NUMBER: return make_object<Number>(gc, tok.n_val);
-        case T_LPAREN: return read_list(gc);
+        case T_STRING: return make_object<String>(tok.s_val.size(), tok.s_val.data());
+        case T_IDENTIFIER: return make_object<Symbol>(tok.s_val.size(), tok.s_val.data());
+        case T_NUMBER: return make_object<Number>(tok.n_val);
+        case T_LPAREN: return read_list();
         case T_RPAREN:
             throw std::runtime_error("unexpected closing paren");
-        case T_EOF: return make_object<Nil>(gc); // FIXME
+        case T_EOF: return consts.nil; // FIXME
     }
 }
 
-Object* read_list (GarbageCollector& gc)
+Object* read_list ()
 {
     Token tok = scan(std::cin);
     if (tok.type == T_RPAREN) {
-        return nil_constant;
+        return consts.nil;
     }
     else if (tok.type == T_EOF) {
         throw;
     }
-    return make_object<Pair>(gc, read(gc, tok), read_list(gc));
+    return make_object<Pair>(read(tok), read_list());
 }
 
 /// Reads syntax datum and returns a datum.
-Object* read (GarbageCollector& gc)
+Object* read ()
 {
-    return read(gc, scan(std::cin));
+    return read(scan(std::cin));
 }
 
 
-std::map<std::string, Object*> variable_bindings;
-
-Object* evaluate (GarbageCollector& gc, Object* form);
-
-
-Object* special_form_define (GarbageCollector& gc, Object* args)
+class Scheme
 {
-    if (args->type != Object::pair_type) {
-        throw std::runtime_error("invalid `define' form (1st arg)");
-    }
-    auto pair1 = static_cast<Pair*>(args);
+    std::map<std::string, Object*> variable_bindings;
 
-    if (pair1->cdr->type != Object::pair_type) {
-        throw std::runtime_error("invalid `define' form (2nd arg)");
-    }
-    auto pair2 = static_cast<Pair*>(pair1->cdr);
-
-    if (pair2->cdr != nil_constant) {
-        throw std::runtime_error("invalid `define' form (3rd arg)");
+public:
+    Scheme ()
+    {
+        variable_bindings["pi"] = make_object<Number>(3.141592);
+        gc.add_root_pointer(reinterpret_cast<Object**>(&variable_bindings["pi"]));
     }
 
-    if (pair1->car->type != Object::symbol_type) {
-        throw std::runtime_error("invalid `define' form (variable is not symbol)");        
-    }
-    auto name = std::string(static_cast<Symbol*>(pair1->car)->data);
-
-    if (variable_bindings.find(name) != variable_bindings.end()) {
-        throw std::runtime_error("variable already defined");
-    }
-
-    auto value = evaluate(gc, pair2->car);
-    variable_bindings[name] = value;
-    gc.add_root_pointer(reinterpret_cast<Object**>(&variable_bindings[name]));
-    return make_object<String>(gc, 3, "non");
-}
-
-Object* evaluate (GarbageCollector& gc, Object* form)
-{
-    if (form->type == Object::symbol_type) {
-        auto name = std::string(static_cast<String*>(form)->data);
-        auto it = variable_bindings.find(name);
-        if (it == variable_bindings.end()) {
-            throw std::runtime_error("variable not bound");
+    Object* special_form_define (Object* args)
+    {
+        if (args->type != Object::pair_type) {
+            throw std::runtime_error("invalid `define' form (1st arg)");
         }
-        return it->second;
-    }
-    if (form->type != Object::pair_type) {
-        return form;
+        auto pair1 = static_cast<Pair*>(args);
+
+        if (pair1->cdr->type != Object::pair_type) {
+            throw std::runtime_error("invalid `define' form (2nd arg)");
+        }
+        auto pair2 = static_cast<Pair*>(pair1->cdr);
+
+        if (pair2->cdr != consts.nil) {
+            throw std::runtime_error("invalid `define' form (3rd arg)");
+        }
+
+        if (pair1->car->type != Object::symbol_type) {
+            throw std::runtime_error("invalid `define' form (variable is not symbol)");        
+        }
+        auto name = std::string(static_cast<Symbol*>(pair1->car)->data);
+
+        if (variable_bindings.find(name) != variable_bindings.end()) {
+            throw std::runtime_error("variable already defined");
+        }
+
+        auto value = evaluate(pair2->car);
+        variable_bindings[name] = value;
+        gc.add_root_pointer(reinterpret_cast<Object**>(&variable_bindings[name]));
+        return make_object<String>(3, "non");
     }
 
-    auto p = static_cast<Pair*>(form);
+    Object* evaluate (Object* form)
+    {
+        if (form->type == Object::symbol_type) {
+            auto name = std::string(static_cast<String*>(form)->data);
+            auto it = variable_bindings.find(name);
+            if (it == variable_bindings.end()) {
+                throw std::runtime_error("variable not bound");
+            }
+            return it->second;
+        }
+        if (form->type != Object::pair_type) {
+            return form;
+        }
 
-    // Check for syntax.
-    if (p->car->type == Object::symbol_type) {
-        auto name = std::string(static_cast<String*>(p->car)->data);
-        if (name == "define") { return special_form_define(gc, p->cdr); }
+        auto p = static_cast<Pair*>(form);
+
+        // Check for syntax.
+        if (p->car->type == Object::symbol_type) {
+            auto name = std::string(static_cast<String*>(p->car)->data);
+            if (name == "define") { return special_form_define(p->cdr); }
+        }
+
+        throw std::runtime_error("I'm confused...");
     }
-}
-
+};
 
 void print (std::ostream& stream, const Object* obj);
 
@@ -413,7 +433,7 @@ void print_tail (std::ostream& stream, const Pair* obj, bool initial = false)
 {
     if (initial) { stream << '('; }
     print(stream, obj->car);
-    if (obj->cdr == nil_constant) {
+    if (obj->cdr == consts.nil) {
         stream << ')';
     }
     else if (obj->cdr->type == Object::pair_type) {
@@ -459,39 +479,26 @@ void print (std::ostream& stream, const Object* obj)
     }
 }
 
+
 std::ostream& operator<< (std::ostream& stream, const Object* obj)
 {
     print(stream, obj);
     return stream;
 }
 
+}; // namespace scheme_ns
 
 int main (int argc, char* argv[])
 {
-    std::cout << "Pair    size "<<sizeof(Pair)<<" align "<< alignof(Pair) << std::endl;
-    std::cout << "Symbol  size "<<sizeof(Symbol)<<" align "<< alignof(Symbol) << std::endl;
-    std::cout << "Number  size "<<sizeof(Number)<<" align "<< alignof(Number) << std::endl;
-    std::cout << "String  size "<<sizeof(String)<<" align "<< alignof(String) << std::endl;
-    std::cout << "Nil     size "<<sizeof(Nil)<<" align "<< alignof(Nil) << std::endl;
+    using namespace scheme_ns;
 
-
-    GarbageCollector gc(300);
-    nil_constant = make_object<Nil>(gc);
-    gc.add_root_pointer(reinterpret_cast<Object**>(&nil_constant));
-
-    Pair* loop1 = make_object<Pair>(gc, nil_constant, nil_constant);
-    Pair* loop2 = make_object<Pair>(gc, loop1, nil_constant);
-    loop1->car = loop2;
-    gc.add_root_pointer(reinterpret_cast<Object**>(&loop1));
-
-    variable_bindings["pi"] = make_object<Number>(gc, 3.141592);
-    gc.add_root_pointer(reinterpret_cast<Object**>(&variable_bindings["pi"]));
+    Scheme sc;
 
     while (true) {
         std::cout << "> ";
-        auto x = evaluate(gc, read(gc));
+        auto x = sc.evaluate(read());
         std::cout << "==> " << x << std::endl;
-        if (x->type == Object::nil_type) break;
+        if (x == consts.nil) break;
         gc.collect();
     } 
 

@@ -41,9 +41,24 @@ struct Object
     TypeTag type;
     bool gc_mark;
 
+    std::string type_name () const
+    {
+        switch (type) {
+            case pair_type: return "pair";
+            case symbol_type: return "symbol";
+            case number_type: return "number";
+            case string_type: return "string";
+            case nil_type: return "nil";
+        }
+    }
+
 protected:
     Object (TypeTag type) : type(type), gc_mark(false) {}
 };
+
+// template<typename T>
+// struct is_object : std::conditional< std::is_base_of<>
+
 
 struct Pair : Object
 {
@@ -88,6 +103,7 @@ struct Symbol : Object
     }
     static size_t total_size (int len, const char* source) { return sizeof(Symbol) + len + 1; }
 };
+
 
 struct Number : Object
 {
@@ -198,17 +214,23 @@ public:
         generic_pool.reserve(generic_pool_size);
     }
 
-    void add_root_pointer (Object** pointer)
+    template<class T>
+    void add_root_pointer (T** pointer)
     {
-        std::cout << "add " << pointer<<"->"<<*pointer << std::endl;
-        root_pointers.push_back(pointer);
+        static_assert(std::is_base_of<Object,T>::value, "T must be-an object");
+        auto p = reinterpret_cast<Object**>(pointer);
+        std::cout << "add " << p << "->" << *p << std::endl;
+        root_pointers.push_back(p);
     }
 
-    void remove_root_pointer (Object** pointer)
+    template<class T>
+    void remove_root_pointer (T** pointer)
     {
+        static_assert(std::is_base_of<Object,T>::value, "T must be-an object");
+        auto p = reinterpret_cast<Object**>(pointer);
         root_pointers.erase(std::remove(root_pointers.begin(),
                                         root_pointers.end(),
-                                        pointer));
+                                        p));
     }
 
 
@@ -305,7 +327,9 @@ namespace consts {
     template<typename T>
     struct automatic_ptr {
         std::unique_ptr<T> ptr;
-        automatic_ptr () : ptr(new T()) {}
+        automatic_ptr () : ptr(new T()) {
+            static_assert(std::is_base_of<Object,T>::value, "T must be-an object");
+        }
         operator T* () { return ptr.get(); }
     };
 
@@ -318,11 +342,34 @@ GarbageCollector gc(1000);
 template<class T, class... Args>
 T* make_object (Args&&... args)
 {
+    static_assert(std::is_base_of<Object,T>::value, "T must be-an object");
+
     size_t size = T::total_size(std::forward<Args>(args)...);
     // void* ptr = gc.allocate(alignof(T), size);
     void* ptr = gc.allocate(OBJECT_ALIGNMENT, size);
     return new(ptr) T(std::forward<Args>(args)...);
 }
+
+Object* car (Object* o)
+{
+    if (o->type != Object::pair_type) {
+        throw std::runtime_error("expecting pair, got " + o->type_name());
+    }
+    return static_cast<Pair*>(o)->car;
+}
+
+Object* cdr (Object* o)
+{
+    if (o->type != Object::pair_type) {
+        throw std::runtime_error("expecting pair, got " + o->type_name());
+    }
+    return static_cast<Pair*>(o)->cdr;
+}
+
+Object* caar (Object* o) { return car(car(o)); }
+Object* cadr (Object* o) { return car(cdr(o)); }
+Object* cdar (Object* o) { return cdr(car(o)); }
+Object* cddr (Object* o) { return cdr(cdr(o)); }
 
 Object* read_list ();
 
@@ -358,6 +405,16 @@ Object* read ()
 }
 
 
+class evaluation_error : public std::runtime_error
+{
+public:
+    evaluation_error (const std::string& what)
+        : std::runtime_error(what)
+        { }
+
+    std::vector<Object*> expressions;
+};
+
 class Scheme
 {
     std::map<std::string, Object*> variable_bindings;
@@ -366,47 +423,46 @@ public:
     Scheme ()
     {
         variable_bindings["pi"] = make_object<Number>(3.141592);
-        gc.add_root_pointer(reinterpret_cast<Object**>(&variable_bindings["pi"]));
+        gc.add_root_pointer(&variable_bindings["pi"]);
     }
 
     Object* special_form_define (Object* args)
     {
         if (args->type != Object::pair_type) {
-            throw std::runtime_error("invalid `define' form (1st arg)");
-        }
-        auto pair1 = static_cast<Pair*>(args);
-
-        if (pair1->cdr->type != Object::pair_type) {
-            throw std::runtime_error("invalid `define' form (2nd arg)");
-        }
-        auto pair2 = static_cast<Pair*>(pair1->cdr);
-
-        if (pair2->cdr != consts::nil) {
-            throw std::runtime_error("invalid `define' form (3rd arg)");
+            throw evaluation_error("invalid `define' form (1st arg)");
         }
 
-        if (pair1->car->type != Object::symbol_type) {
-            throw std::runtime_error("invalid `define' form (variable is not symbol)");        
+        if (cdr(args)->type != Object::pair_type) {
+            throw evaluation_error("invalid `define' (2nd arg)");
         }
-        auto name = std::string(static_cast<Symbol*>(pair1->car)->data);
+
+        if (cddr(args) != consts::nil) {
+            throw evaluation_error("invalid `define' (more than 2 arguments)");
+        }
+
+        if (car(args)->type != Object::symbol_type) {
+            throw evaluation_error("invalid `define' (variable is not a symbol)");        
+        }
+        auto name = std::string(static_cast<Symbol*>(car(args))->data);
 
         if (variable_bindings.find(name) != variable_bindings.end()) {
-            throw std::runtime_error("variable already defined");
+            throw evaluation_error("variable `" + name + "' already defined");
         }
 
-        auto value = evaluate(pair2->car);
+        auto value = evaluate(cadr(args));
         variable_bindings[name] = value;
-        gc.add_root_pointer(reinterpret_cast<Object**>(&variable_bindings[name]));
+        gc.add_root_pointer(&variable_bindings[name]);
         return make_object<String>(3, "non");
     }
 
     Object* evaluate (Object* form)
     {
+        try {
         if (form->type == Object::symbol_type) {
             auto name = std::string(static_cast<String*>(form)->data);
             auto it = variable_bindings.find(name);
             if (it == variable_bindings.end()) {
-                throw std::runtime_error("variable not bound");
+                throw evaluation_error("variable not bound");
             }
             return it->second;
         }
@@ -422,7 +478,12 @@ public:
             if (name == "define") { return special_form_define(p->cdr); }
         }
 
-        throw std::runtime_error("I'm confused...");
+        throw evaluation_error("I'm confused...");
+        }
+        catch (evaluation_error& e) {
+            e.expressions.push_back(form);
+            throw;
+        }
     }
 };
 
@@ -496,9 +557,26 @@ int main (int argc, char* argv[])
 
     while (true) {
         std::cout << "> ";
-        auto x = sc.evaluate(read());
-        std::cout << "==> " << x << std::endl;
-        if (x == consts::nil) break;
+        auto expr = read();
+        try {
+            auto x = sc.evaluate(expr);
+            std::cout << "==> " << x << std::endl;
+            if (x == consts::nil) break;
+        }
+        catch (const evaluation_error& e) {
+            std::cerr << "Error\n  " << e.what() << std::endl;
+            std::cerr << "while evaluating expression\n";
+            std::cerr << "     " << e.expressions.front() << std::endl;
+            for (auto it = e.expressions.begin()+1; it != e.expressions.end(); ++it) {
+                std::cerr << "  in " << (*it) << std::endl;
+            }
+            break;
+        }
+        catch (const std::runtime_error& e) {
+            std::cerr << "Error\n  " << e.what() << std::endl;
+            std::cerr << "while evaluating expression " << expr << std::endl;
+            break;
+        }
         gc.collect();
     } 
 

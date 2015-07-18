@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <exception>
+#include <list>
 #include <map>
 #include <memory>
 #include <vector>
@@ -439,20 +440,55 @@ public:
 
 class Scheme
 {
-    std::map<std::string, Object*> variable_bindings;
+    std::list<std::map<std::string, Object*>> binding_contours;
+
+private:
+    void push_binding_contour ()
+    {
+        binding_contours.push_back(std::map<std::string, Object*>());
+    }
+
+    void pop_binding_contour ()
+    {
+        for (auto& it : binding_contours.back())
+        {
+            gc.remove_root_pointer(&(it.second));
+        }
+        binding_contours.pop_back();
+    }
+
+    void bind_variable (const std::string& name, Object* storage)
+    {
+        auto& contour = binding_contours.back();
+        if (contour.find(name) != contour.end()) {
+            throw evaluation_error("variable `" + name + "' already bound");
+        }
+        contour[name] = storage;
+        gc.add_root_pointer(&contour[name]);
+    }
+
+    Object* lookup_variable (const std::string& name)
+    {
+        for (auto it = binding_contours.rbegin();
+             it != binding_contours.rend();
+             ++it)
+        {
+            auto binding_it = it->find(name);
+            if (binding_it != it->end()) {
+                return binding_it->second;
+            }
+        }
+        throw evaluation_error("variable `" + name + "' not bound in current binding environment.");
+    }
+
 
 public:
     Scheme ()
     {
-        variable_bindings["pi"] = make_object<Number>(3.141592);
-        gc.add_root_pointer(&variable_bindings["pi"]);
-
-        variable_bindings["#f"] = consts::f;
-        gc.add_root_pointer(&variable_bindings["#f"]);
-
-        variable_bindings["#t"] = consts::t;
-        gc.add_root_pointer(&variable_bindings["#t"]);
-
+        push_binding_contour();
+        bind_variable("pi", make_object<Number>(3.141592));
+        bind_variable("#f", consts::f);
+        bind_variable("#t", consts::t);
     }
 
     Object* special_form_define (Object* args)
@@ -474,14 +510,57 @@ public:
         }
         auto name = std::string(static_cast<Symbol*>(car(args))->data);
 
-        if (variable_bindings.find(name) != variable_bindings.end()) {
-            throw evaluation_error("variable `" + name + "' already defined");
+        auto value = evaluate(cadr(args));
+        bind_variable(name, value);
+
+        return make_object<String>(3, "non"); // fixme
+    }
+
+    Object* special_form_let_star (Object* args)
+    {
+        push_binding_contour();
+
+        if (args->type != Object::pair_type) {
+            throw evaluation_error("invalid `let*' (1st arg)");
         }
 
-        auto value = evaluate(cadr(args));
-        variable_bindings[name] = value;
-        gc.add_root_pointer(&variable_bindings[name]);
-        return make_object<String>(3, "non");
+        // Bindings.
+        auto bindings = car(args);
+        for (auto binding_iter = bindings;
+            binding_iter != consts::nil;
+            binding_iter = cdr(binding_iter))
+        {
+            if (binding_iter->type != Object::pair_type) {
+                throw evaluation_error("invalid `let*' (binding 1st arg)");
+            }
+            auto binding = car(binding_iter);
+            if (binding->type != Object::pair_type) {
+                throw evaluation_error("invalid `let*' (binding 2nd arg)");
+            }
+            if (cddr(binding) != consts::nil) {
+                throw evaluation_error("invalid `let*' (more than 2 args)");
+            }
+            if (car(binding)->type != Object::symbol_type) {
+                throw evaluation_error("variable is not a symbol");
+            }
+            std::string name = std::string(static_cast<Symbol*>(car(binding))->data);
+            auto value = evaluate(cadr(binding));
+            bind_variable(name, value);
+        }
+
+        // Body.
+        auto body_pair = cdr(args);
+        Object* result = consts::nil;
+        while (body_pair != consts::nil) {
+            if (body_pair->type != Object::pair_type) {
+                throw evaluation_error("`let*' body is not a list");
+            }
+            result = evaluate(car(body_pair));
+            body_pair = cdr(body_pair);
+        }
+
+        pop_binding_contour();
+        return result;
     }
 
     Object* special_form_if (Object* args)
@@ -517,11 +596,7 @@ public:
         try {
         if (form->type == Object::symbol_type) {
             auto name = std::string(static_cast<String*>(form)->data);
-            auto it = variable_bindings.find(name);
-            if (it == variable_bindings.end()) {
-                throw evaluation_error("variable not bound");
-            }
-            return it->second;
+            return lookup_variable(name);
         }
         if (form->type != Object::pair_type) {
             return form;
@@ -533,6 +608,7 @@ public:
         if (p->car->type == Object::symbol_type) {
             auto name = std::string(static_cast<String*>(p->car)->data);
             if (name == "define") { return special_form_define(p->cdr); }
+            if (name == "let*") { return special_form_let_star(p->cdr); }
             if (name == "if") { return special_form_if(p->cdr); }
         }
 

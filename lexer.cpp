@@ -136,7 +136,7 @@ Token scan (std::istream& is)
                 break;
 
             case S_IDENTIFIER:
-                if (isalnum(c) || c == '#') {
+                if (isalnum(c) || c == '#' || c == '*') {
                     lexeme += c;
                 }
                 else if (c == '(' || c == ')' || isspace(c)) {

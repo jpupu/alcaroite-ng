@@ -64,7 +64,7 @@ Token scan (std::istream& is)
                     lexeme += c;
                     state = S_INTEGER;
                 }
-                else if (c == '_' || isalpha(c)) {
+                else if (c == '_' || isalpha(c) || c == '#') {
                     lexeme += c;
                     state = S_IDENTIFIER;
                 }
@@ -136,7 +136,7 @@ Token scan (std::istream& is)
                 break;
 
             case S_IDENTIFIER:
-                if (isalnum(c)) {
+                if (isalnum(c) || c == '#') {
                     lexeme += c;
                 }
                 else if (c == '(' || c == ')' || isspace(c)) {

@@ -32,6 +32,7 @@ constexpr size_t OBJECT_ALIGNMENT = 8;
 struct Object
 {
     enum TypeTag {
+        boolean_type,
         pair_type,
         symbol_type,
         number_type,
@@ -44,6 +45,7 @@ struct Object
     std::string type_name () const
     {
         switch (type) {
+            case boolean_type: return "boolean";
             case pair_type: return "pair";
             case symbol_type: return "symbol";
             case number_type: return "number";
@@ -59,6 +61,14 @@ protected:
 // template<typename T>
 // struct is_object : std::conditional< std::is_base_of<>
 
+
+struct Boolean : Object
+{
+    const bool value;
+
+    Boolean (bool v) : Object(boolean_type), value(v) {}
+    static size_t total_size (bool v) { return sizeof(Boolean); }
+};
 
 struct Pair : Object
 {
@@ -124,6 +134,7 @@ struct Nil : Object
 size_t object_sizeof (const Object* obj)
 {
     switch (obj->type) {
+        case Object::boolean_type: return sizeof(Boolean);
         case Object::pair_type: return sizeof(Pair);
         case Object::symbol_type:
             return sizeof(Symbol) + static_cast<const Symbol*>(obj)->len + 1;
@@ -327,13 +338,16 @@ namespace consts {
     template<typename T>
     struct automatic_ptr {
         std::unique_ptr<T> ptr;
-        automatic_ptr () : ptr(new T()) {
+        template<class... Args>
+        automatic_ptr (Args&&... args) : ptr(new T(std::forward<Args>(args)...)) {
             static_assert(std::is_base_of<Object,T>::value, "T must be-an object");
         }
         operator T* () { return ptr.get(); }
     };
 
    automatic_ptr<Nil> nil;
+   automatic_ptr<Boolean> f(false);
+   automatic_ptr<Boolean> t(true);
 };
 
 GarbageCollector gc(1000);
@@ -370,6 +384,14 @@ Object* caar (Object* o) { return car(car(o)); }
 Object* cadr (Object* o) { return car(cdr(o)); }
 Object* cdar (Object* o) { return cdr(car(o)); }
 Object* cddr (Object* o) { return cdr(cdr(o)); }
+Object* caaar (Object* o) { return car(car(car(o))); }
+Object* caadr (Object* o) { return car(car(cdr(o))); }
+Object* cadar (Object* o) { return car(cdr(car(o))); }
+Object* caddr (Object* o) { return car(cdr(cdr(o))); }
+Object* cdaar (Object* o) { return cdr(car(car(o))); }
+Object* cdadr (Object* o) { return cdr(car(cdr(o))); }
+Object* cddar (Object* o) { return cdr(cdr(car(o))); }
+Object* cdddr (Object* o) { return cdr(cdr(cdr(o))); }
 
 Object* read_list ();
 
@@ -424,12 +446,19 @@ public:
     {
         variable_bindings["pi"] = make_object<Number>(3.141592);
         gc.add_root_pointer(&variable_bindings["pi"]);
+
+        variable_bindings["#f"] = consts::f;
+        gc.add_root_pointer(&variable_bindings["#f"]);
+
+        variable_bindings["#t"] = consts::t;
+        gc.add_root_pointer(&variable_bindings["#t"]);
+
     }
 
     Object* special_form_define (Object* args)
     {
         if (args->type != Object::pair_type) {
-            throw evaluation_error("invalid `define' form (1st arg)");
+            throw evaluation_error("invalid `define' (1st arg)");
         }
 
         if (cdr(args)->type != Object::pair_type) {
@@ -455,6 +484,34 @@ public:
         return make_object<String>(3, "non");
     }
 
+    Object* special_form_if (Object* args)
+    {
+        if (args->type != Object::pair_type) {
+            throw evaluation_error("invalid `if' (1st arg)");
+        }
+
+        if (cdr(args)->type != Object::pair_type) {
+            throw evaluation_error("invalid `if' (2nd arg)");
+        }
+
+        if (cddr(args)->type != Object::pair_type) {
+            throw evaluation_error("invalid `if' (3rd arg)");
+        }
+
+        if (cdddr(args) != consts::nil) {
+            throw evaluation_error("invalid `if' (more than 3 arguments)");
+        }
+
+        auto test = evaluate(car(args));
+
+        if (test != consts::f) {
+            return evaluate(cadr(args));
+        }
+        else {
+            return evaluate(caddr(args));
+        }
+    }
+
     Object* evaluate (Object* form)
     {
         try {
@@ -476,6 +533,7 @@ public:
         if (p->car->type == Object::symbol_type) {
             auto name = std::string(static_cast<String*>(p->car)->data);
             if (name == "define") { return special_form_define(p->cdr); }
+            if (name == "if") { return special_form_if(p->cdr); }
         }
 
         throw evaluation_error("I'm confused...");
@@ -512,6 +570,11 @@ void print_tail (std::ostream& stream, const Pair* obj, bool initial = false)
 void print (std::ostream& stream, const Object* obj)
 {
     switch (obj->type) {
+        case Object::boolean_type: {
+            auto o = static_cast<const Boolean*>(obj);
+            stream << (o->value ? "#t" : "#f");
+            break;
+        }
         case Object::pair_type: {
             auto o = static_cast<const Pair*>(obj);
             print_tail(stream, o, true);

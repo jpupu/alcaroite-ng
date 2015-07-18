@@ -170,9 +170,9 @@ private:
 private:
     void mark_object_recursive (Object* obj)
     {
-        std::cout << "GC: mark " << obj << std::endl;
+        // std::cout << "GC: mark " << obj << std::endl;
         if (obj->gc_mark) {
-            std::cout << "GC: loop detected\n";
+            // std::cout << "GC: loop detected\n";
             return;
         }
         obj->gc_mark = true;
@@ -186,9 +186,9 @@ private:
 
     void update_object_recursive (Object* obj, const std::map<Object*, Object*>& moves)
     {
-        std::cout << "GC: update " << obj << std::endl;
+        // std::cout << "GC: update " << obj << std::endl;
         if (!obj->gc_mark) {
-            std::cout << "GC: loop detected\n";
+            // std::cout << "GC: loop detected\n";
             return;
         }
         obj->gc_mark = false;
@@ -219,7 +219,7 @@ public:
     {
         static_assert(std::is_base_of<Object,T>::value, "T must be-an object");
         auto p = reinterpret_cast<Object**>(pointer);
-        std::cout << "add " << p << "->" << *p << std::endl;
+        // std::cout << "add " << p << "->" << *p << std::endl;
         root_pointers.push_back(p);
     }
 
@@ -236,13 +236,13 @@ public:
 
     void collect ()
     {
-        std::cout << "GC: collection started\n";
+        // std::cout << "GC: collection started\n";
 
         // Mark.
-        for(int i = 0; i < root_pointers.size(); i++)
-        {
-            std::cout << "***" << i << "  " << root_pointers[i] << " -> " << (*root_pointers[i]) << '\n';
-        }
+        // for(int i = 0; i < root_pointers.size(); i++)
+        // {
+        //     std::cout << "***" << i << "  " << root_pointers[i] << " -> " << (*root_pointers[i]) << '\n';
+        // }
         for (auto it : root_pointers) {
             mark_object_recursive(*it);
         }
@@ -256,15 +256,15 @@ public:
             auto o = reinterpret_cast<Object*>(point);
             size_t size = object_sizeof(o);
 
-            std::cout << "GC: check " << o << " type: " << o->type << std::endl;
+            // std::cout << "GC: check " << o << " type: " << o->type << std::endl;
 
             if (!o->gc_mark) {
-                std::cout << "GC:   remove " << o << std::endl;
+                // std::cout << "GC:   remove " << o << std::endl;
             }
             else {
                 // move if needed.
                 if (new_limit != point) {
-                    std::cout << "GC:   move -> " << new_limit << std::endl;
+                    // std::cout << "GC:   move -> " << new_limit << std::endl;
                     memmove(new_limit, point, size);
                     moves[o] = reinterpret_cast<Object*>(new_limit);
                 }
@@ -273,7 +273,7 @@ public:
             point = object_align(point + size);
         }
         generic_pool.resize(new_limit - generic_pool.data());
-        std::cout << "GC: new size " << generic_pool.size() << std::endl;
+        // std::cout << "GC: new size " << generic_pool.size() << std::endl;
 
         // Update pointers.
         if (!moves.empty()) {
@@ -284,12 +284,12 @@ public:
             }
         }
 
-        std::cout << "GC: collection ended\n";
+        // std::cout << "GC: collection ended\n";
     }
 
     void* allocate (size_t alignment, size_t size)
     {
-        std::cout << "GC: allocating " << size << " bytes (" << alignment << " byte alignemnt)\n"; 
+        // std::cout << "GC: allocating " << size << " bytes (" << alignment << " byte alignemnt)\n"; 
 
         size_t point = generic_pool.size();
         // Move point so it's properly aligned.
@@ -314,7 +314,7 @@ public:
         //     }
         // }
 
-        std::cout << "GC: allocated at point " << point << " @ " << static_cast<void*>(generic_pool.data() + point) << '\n';
+        // std::cout << "GC: allocated at point " << point << " @ " << static_cast<void*>(generic_pool.data() + point) << '\n';
 
         // We have capacity, so allocate the memory.
         generic_pool.resize(point + size);

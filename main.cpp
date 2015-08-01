@@ -1,4 +1,5 @@
 #include "pupumath_plain.hpp"
+#include "ValueBlock.hpp"
 #include <memory>
 
 using namespace pupumath_plain;
@@ -7,6 +8,7 @@ using namespace pupumath_plain;
 #include <tuple>
 #include <vector>
 #include <array>
+#include <iostream>
 
 #ifndef M_PI
 #define M_PI 3.141592
@@ -716,13 +718,61 @@ std::vector<GeometricObject> objects = {
     // { std::make_shared<Sphere>(), std::make_shared<TransparentSurface>(), std::make_shared<DirtyAir>(vec3(.5,.5,.5)), 10 },
     // { std::make_shared<ScaledSphere>(1.3), std::make_shared<Glass>(vec3(1.0), vec3(1.0)), std::make_shared<DirtyAir>(vec3(.995,.95,.85)), 20 },
     // { std::make_shared<Sphere>(), std::make_shared<PerfectMirror>(vec3(1.0)), 20, Transform::scale(vec3(.5)) },
-    { std::make_shared<Sphere>(), std::make_shared<Glass>(vec3(1.5), vec3(9.0,1.0,9.0)), 20, Transform::scale(vec3(1.3)) },
+    // { std::make_shared<Sphere>(), std::make_shared<Glass>(vec3(1.5), vec3(9.0,1.0,9.0)), 20, Transform::scale(vec3(1.3)) },
     // { std::make_shared<ScaledSphere>(.6), std::make_shared<Glass>(vec3(1.0), vec3(0.0,0.0,0.0)), 100 },
     // { std::make_shared<Sphere>(), std::make_shared<PerfectMirror>(vec3(1.0)), std::make_shared<CleanAir>(), 100 },
     // { std::make_shared<Sphere>(), std::make_shared<Matte>(vec3(0.0,1.0,0.0)), std::make_shared<DirtyAir>(vec3(.5,.5,.5)), 10 },
-    { std::make_shared<Plane>(), std::make_shared<Matte>(vec3(.8)), 200, Transform::translate(vec3(0,-.5,0)) * Transform::rotate_z(20) },
+    // { std::make_shared<Plane>(), std::make_shared<Matte>(vec3(.8)), 200, Transform::translate(vec3(0,-.5,0)) * Transform::rotate_z(20) },
     // { std::make_shared<Plane>(), std::make_shared<Glass>(vec3(1.0), vec3(1.0), vec3(1.0)), 200 },
 };
+
+void build_scene(const std::vector<ValueBlock>& blocks)
+{
+  std::map<std::string, std::shared_ptr<Material>> materials;
+  std::map<std::string, std::shared_ptr<Shape>> shapes;
+  for (const auto& block : blocks) {
+
+    if (block.type == "material") {
+      auto type = block.get<std::string>("type");
+      if (type == "glass") {
+        auto o = std::make_shared<Glass>(vec3(block.get<double>("ior")),
+                                         block.get<vec3>("absorbance"));
+        materials[block.id] = o;
+      }
+      else if (type == "matte") {
+        auto o =
+            std::make_shared<Matte>(vec3(block.get<double>("reflectance")));
+        materials[block.id] = o;
+      }
+      else {
+        throw std::runtime_error("unknown material");
+      }
+    }
+    else if (block.type == "shape") {
+      auto type = block.get<std::string>("type");
+      if (type == "sphere") {
+        auto o = std::make_shared<Sphere>();
+        shapes[block.id] = o;
+      }
+      else if (type == "plane") {
+        auto o = std::make_shared<Plane>();
+        shapes[block.id] = o;
+      }
+      else {
+        throw std::runtime_error("unknown shape");
+      }
+    }
+    else if (block.type == "object") {
+      auto shape = shapes.at(block.get<std::string>("shape"));
+      auto material = materials.at(block.get<std::string>("material"));
+      objects.push_back({shape,
+                         material,
+                         static_cast<int>(block.get<double>("priority")),
+                         {block.get<mat34>("transform"),
+                          block.get<mat34>("inverse_transform")}});
+    }
+  }
+}
 
 class InteriorList
 {
@@ -1007,11 +1057,15 @@ int main ()
     // printf("wi %f %f %f (%f)\n", wi.x, wi.y, wi.z, acosf(fabs(wi.z))/M_PI*180);
 
     // return 0;
+    auto blocks = read_valueblock_file(std::cin);
+    for (const auto& block : blocks) {
+        std::cout << block; 
+    }
+    build_scene(blocks);
 
-
-    constexpr int W = 800;
-    constexpr int H = 800;
-    constexpr int S = 100;
+    constexpr int W = 400;
+    constexpr int H = 400;
+    constexpr int S = 40;
     printf("Rendering %dx%d with %d samples/pixel\n", W, H, S);
     Framebuffer framebuffer(W, H);
     vec3 origin = vec3(0,0.3,2);

@@ -1,0 +1,35 @@
+       
+material _mat0
+:: type glass
+:: ior 1.5
+:: absorbance vec 9 1 9
+.
+
+material _mat1
+:: type matte
+:: reflectance .8
+.
+
+shape _shape0
+:: type sphere
+:: file bunny%20file.ply
+.
+
+shape _shape1
+:: type plane
+
+object _obj0
+:: shape _shape0
+:: material _mat0
+:: priority 20
+:: transform mat 1 0 0 0  0 1 0 0  0 0 1 0
+:: inverse_transform mat 1 0 0 0  0 1 0 0  0 0 1 0
+.
+
+object _obj1
+:: shape _shape1
+:: material _mat1
+:: priority 40
+:: transform mat 1 0 0 0  0 1 0 -1.0  0 0 1 0
+:: inverse_transform mat 1 0 0 0  0 1 0 1.0  0 0 1 0
+.

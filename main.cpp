@@ -966,8 +966,8 @@ public:
 
     void save_ppm ()
     {
-        FILE* fp = fopen("foo.ppm", "wb");
-        fprintf(fp, "P6\n%d %d\n255\n", xres, yres);
+        auto buffer = std::make_unique<char[]>(xres*yres*3);
+        
         for (int i = 0; i < xres*yres; i++) {
             vec3 c = pixels[i].normalized();
             for (int k = 0; k < 3; k++) {
@@ -982,9 +982,12 @@ public:
                     ck = (1 + a) * powf(ck, 1/2.4) - a; // is 2.4 right?
                 }
                 ck = std::min(1.0f, std::max(0.0f, ck));
-                fputc(int(255*ck), fp);
+                buffer[i*3+k] = int(255*ck);
             }
         }
+        FILE* fp = fopen("foo.ppm", "wb");
+        fprintf(fp, "P6\n%d %d\n255\n", xres, yres);
+        fwrite(buffer.get(), xres*yres*3, 1, fp);
         fclose(fp);
     }
 

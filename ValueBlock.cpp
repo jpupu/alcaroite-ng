@@ -1,7 +1,4 @@
 #include "ValueBlock.hpp"
-
-#include "pupumath_plain.hpp"
-
 #include <istream>
 #include <ostream>
 
@@ -30,7 +27,7 @@ double ValueBlock::get(const std::string& name) const
 }
 
 template <>
-vec3 ValueBlock::get(const std::string& name) const
+pupumath::vec3 ValueBlock::get(const std::string& name) const
 {
   auto val = vvalues.find(name);
   if (val == vvalues.end()) {
@@ -41,7 +38,7 @@ vec3 ValueBlock::get(const std::string& name) const
 }
 
 template <>
-mat34 ValueBlock::get(const std::string& name) const
+pupumath::mat34 ValueBlock::get(const std::string& name) const
 {
   auto val = mvalues.find(name);
   if (val == mvalues.end()) {
@@ -70,7 +67,7 @@ void ValueBlock::set(const std::string& name, double value)
 }
 
 template <>
-void ValueBlock::set(const std::string& name, vec3 value)
+void ValueBlock::set(const std::string& name, pupumath::vec3 value)
 {
   if (vvalues.find(name) != vvalues.end()) {
     throw std::runtime_error("vector value " + id + ":" + name + " redefined");
@@ -79,7 +76,7 @@ void ValueBlock::set(const std::string& name, vec3 value)
 }
 
 template <>
-void ValueBlock::set(const std::string& name, mat34 value)
+void ValueBlock::set(const std::string& name, pupumath::mat34 value)
 {
   if (mvalues.find(name) != mvalues.end()) {
     throw std::runtime_error("matrix value " + id + ":" + name + " redefined");
@@ -97,12 +94,12 @@ void ValueBlock::read_value(std::istream& istream)
     set(name, v);
   }
   else if (val == "vec") {
-    vec3 v;
+    pupumath::vec3 v;
     istream >> v[0] >> v[1] >> v[2];
     set(name, v);
   }
   else if (val == "mat") {
-    mat34 v;
+    pupumath::mat34 v;
     for (int i = 0; i < 12; ++i) {
       istream >> v[i];
     }

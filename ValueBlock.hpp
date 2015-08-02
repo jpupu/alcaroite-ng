@@ -1,24 +1,18 @@
 #pragma once
 
+#include "pupumath_struct.hpp"
 #include <iosfwd> // forward declare std::istream/ostream
 #include <map>
 #include <string>
 #include <vector>
-
-namespace pupumath_plain {
-struct vec3;
-struct mat34;
-}
-using pupumath_plain::vec3;
-using pupumath_plain::mat34;
 
 struct ValueBlock {
   std::string type;
   std::string id;
   std::map<std::string, std::string> svalues;
   std::map<std::string, double> nvalues;
-  std::map<std::string, vec3> vvalues;
-  std::map<std::string, mat34> mvalues;
+  std::map<std::string, pupumath::vec3> vvalues;
+  std::map<std::string, pupumath::mat34> mvalues;
 
   ValueBlock() {}
   ValueBlock(std::string type, std::string id);

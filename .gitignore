@@ -2,4 +2,8 @@
 *.exe
 *.s
 *.o
+*.d
+*.pyc
+.*.swp
 foo.ppm
+main

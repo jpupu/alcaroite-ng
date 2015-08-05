@@ -1,4 +1,4 @@
- 
+
 material _mat0
 :: type glass
 :: ior 1.5
@@ -33,3 +33,8 @@ object _obj1
 :: transform mat 1 0 0 0  0 1 0 -1.0  0 0 1 0
 :: inverse_transform mat 1 0 0 0  0 1 0 1.0  0 0 1 0
 .
+
+skybox _sb0
+:: type fancy
+.
+

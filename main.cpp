@@ -3,6 +3,7 @@
 #include "ray.hpp"
 #include "sampler.hpp"
 #include "shape.hpp"
+#include "skybox.hpp"
 #include "spectrum.hpp"
 #include "pupumath.hpp"
 #include "ValueBlock.hpp"
@@ -37,30 +38,31 @@ public:
 
 #include <algorithm>
 #include <cstdio>
-float environment (const vec3& v)
-{
-    // return 3.0;
-    float theta = M_PI/2 - acosf(v.y);
-    float phi = atan2f(v.x, v.z);
-    // printf("env %f,%f,%f -> %f / %f\n", v.x,v.y,v.z, dot(v, vec3(0,1,0)), std::max(0.0f, dot(v, vec3(0,1,0))));
-
-    constexpr float F = M_PI / 180;
-    float L = 0.5f + theta;
-    // if (phi > 350*F || phi < 30*F) L = 1.0;
-    if (40*F < phi && phi < 100*F && theta > 40*F && theta < 70*F) L = 8.0;
-    if (-110*F < phi && phi < -30*F && theta > 20*F && theta < 50*F) L = 6.0;
-    // if (theta > 0*F) L = 1.0;
-
-
-    return L;
-    return std::max(0.0f, sinf(phi*10));
-    return std::max(0.0f, dot(v, vec3(0,1,0)));
-    // return 1.0;
-}
+// float environment (const vec3& v)
+// {
+//     // return 3.0;
+//     float theta = M_PI/2 - acosf(v.y);
+//     float phi = atan2f(v.x, v.z);
+//     // printf("env %f,%f,%f -> %f / %f\n", v.x,v.y,v.z, dot(v, vec3(0,1,0)), std::max(0.0f, dot(v, vec3(0,1,0))));
+//
+//     constexpr float F = M_PI / 180;
+//     float L = 0.5f + theta;
+//     // if (phi > 350*F || phi < 30*F) L = 1.0;
+//     if (40*F < phi && phi < 100*F && theta > 40*F && theta < 70*F) L = 8.0;
+//     if (-110*F < phi && phi < -30*F && theta > 20*F && theta < 50*F) L = 6.0;
+//     // if (theta > 0*F) L = 1.0;
+//
+//
+//     return L;
+//     return std::max(0.0f, sinf(phi*10));
+//     return std::max(0.0f, dot(v, vec3(0,1,0)));
+//     // return 1.0;
+// }
 
 
 std::vector<GeometricObject> objects = {
 };
+std::shared_ptr<Skybox> skybox;
 
 void build_scene(const std::vector<ValueBlock>& blocks)
 {
@@ -73,6 +75,9 @@ void build_scene(const std::vector<ValueBlock>& blocks)
     }
     else if (block.type == "shape") {
       shapes[block.id] = build_shape(block);
+    }
+    else if (block.type == "skybox") {
+      skybox = build_skybox(block);
     }
     else if (block.type == "object") {
       auto shape = shapes.at(block.get<std::string>("shape"));
@@ -161,7 +166,7 @@ float radiance (Ray& ray, float wavelen, Sampler& sampler, int sample_index, int
     // printf("%s %p, tmax %f, pos %f,%f,%f, dir %f,%f,%f\n", hit?"hit":"miss",ray.hit_object, ray.tmax, ray.position.x,ray.position.y,ray.position.z, ray.direction.x, ray.direction.y, ray.direction.z);
     if (!hit) {
         // return environment(ray.direction);
-        float e = environment(ray.direction);
+        float e = skybox->sample(ray.direction, wavelen);
         // printf("e=%f\n", e);
         return e;
     }

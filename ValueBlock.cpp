@@ -49,6 +49,17 @@ pupumath::mat34 ValueBlock::get(const std::string& name) const
 }
 
 template <>
+Spectrum ValueBlock::get(const std::string& name) const
+{
+  auto val = spvalues.find(name);
+  if (val == spvalues.end()) {
+    throw std::runtime_error("spectrum value " + id + ":" + name +
+                             " not defined");
+  }
+  return val->second;
+}
+
+template <>
 void ValueBlock::set(const std::string& name, std::string value)
 {
   if (svalues.find(name) != svalues.end()) {
@@ -84,6 +95,15 @@ void ValueBlock::set(const std::string& name, pupumath::mat34 value)
   mvalues[name] = value;
 }
 
+template <>
+void ValueBlock::set(const std::string& name, Spectrum value)
+{
+  if (spvalues.find(name) != spvalues.end()) {
+    throw std::runtime_error("spectrum value " + id + ":" + name + " redefined");
+  }
+  spvalues[name] = value;
+}
+
 void ValueBlock::read_value(std::istream& istream)
 {
   std::string name, val;
@@ -102,6 +122,13 @@ void ValueBlock::read_value(std::istream& istream)
     pupumath::mat34 v;
     for (int i = 0; i < 12; ++i) {
       istream >> v[i];
+    }
+    set(name, v);
+  }
+  else if (val == "spectrum") {
+    Spectrum v;
+    for (int i = 0; i < Spectrum::count; ++i) {
+      istream >> v.samples[i];
     }
     set(name, v);
   }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pupumath_struct.hpp"
+#include "spectrum.hpp"
 #include <iosfwd> // forward declare std::istream/ostream
 #include <map>
 #include <string>
@@ -13,6 +14,7 @@ struct ValueBlock {
   std::map<std::string, double> nvalues;
   std::map<std::string, pupumath::vec3> vvalues;
   std::map<std::string, pupumath::mat34> mvalues;
+  std::map<std::string, Spectrum> spvalues;
 
   ValueBlock() {}
   ValueBlock(std::string type, std::string id);

@@ -18,7 +18,7 @@ void Framebuffer::add_sample(float x, float y, const vec3 &v)
   pixels[int(x) + int(y) * xres].weight += 1;
 }
 
-void Framebuffer::save_ppm()
+void Framebuffer::save_ppm(const std::string& filename)
 {
   auto buffer = std::make_unique<char[]>(xres * yres * 3);
 
@@ -39,7 +39,7 @@ void Framebuffer::save_ppm()
       buffer[i * 3 + k] = int(255 * ck);
     }
   }
-  FILE *fp = fopen("foo.ppm", "wb");
+  FILE *fp = fopen(filename.c_str(), "wb");
   fprintf(fp, "P6\n%d %d\n255\n", xres, yres);
   fwrite(buffer.get(), xres * yres * 3, 1, fp);
   fclose(fp);

@@ -13,10 +13,11 @@
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
+#include <fstream>
 #include <map>
 #include <memory>
+#include <tclap/CmdLine.h>
 using namespace pupumath;
-
 
 Scene build_scene(const std::vector<ValueBlock> &blocks)
 {
@@ -47,7 +48,7 @@ Scene build_scene(const std::vector<ValueBlock> &blocks)
   return scene;
 }
 
-int main()
+int main(int argc, char *argv[])
 {
 
   // vec3 wo = normalize(vec3(-1,0,-1));
@@ -59,15 +60,37 @@ int main()
   // printf("wi %f %f %f (%f)\n", wi.x, wi.y, wi.z, acosf(fabs(wi.z))/M_PI*180);
 
   // return 0;
-  auto blocks = read_valueblock_file(std::cin);
+
+  TCLAP::CmdLine cmd("alcaroite ray tracer", ' ', "alpha", false);
+  TCLAP::ValueArg<int> width_arg("w", "width", "Width in pixels", false, 400,
+                                 "int", cmd);
+  TCLAP::ValueArg<int> height_arg("h", "height", "Height in pixels", false, 400,
+                                  "int", cmd);
+  TCLAP::ValueArg<int> samples_arg("s", "samples", "Sampler per pixel", false,
+                                   40, "int", cmd);
+  TCLAP::UnlabeledValueArg<std::string> input_file_arg(
+      "input", "Input file", "test.ascn", "???", "scene file", cmd);
+  TCLAP::ValueArg<std::string> output_file_arg("o", "output", "Output file",
+                                               false, "foo.ppm", "file", cmd);
+  TCLAP::SwitchArg help_arg("", "help", "Show this help message", cmd);
+
+  cmd.parse(argc, argv);
+
+  if (help_arg.getValue()) {
+    TCLAP::StdOutput().usage(cmd);
+    return 0;
+  }
+
+  std::ifstream infile(input_file_arg.getValue());
+  auto blocks = read_valueblock_file(infile);
   for (const auto &block : blocks) {
     std::cout << block;
   }
   Scene scene = build_scene(blocks);
 
-  constexpr int W = 400;
-  constexpr int H = 400;
-  constexpr int S = 40;
+  int W = width_arg.getValue();
+  int H = height_arg.getValue();
+  int S = samples_arg.getValue();
   printf("Rendering %dx%d with %d samples/pixel\n", W, H, S);
   Framebuffer framebuffer(W, H);
   vec3 origin = vec3(0, 0.3, 2);
@@ -110,5 +133,5 @@ int main()
   auto end = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed = end - start;
   printf("Rendered in %.1f seconds\n", elapsed.count());
-  framebuffer.save_ppm();
+  framebuffer.save_ppm(output_file_arg.getValue());
 }

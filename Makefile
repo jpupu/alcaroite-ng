@@ -1,6 +1,6 @@
 CXX = c++
 
-CXXFLAGS = -std=c++14 -Wall -O3
+CXXFLAGS = -g -ggdb -std=c++14 -Wall -O3 -I.
 
 %.o: %.cpp
 	$(CXX) -MMD -MP -c $(CXXFLAGS) $< -o $@

@@ -99,7 +99,8 @@ template <>
 void ValueBlock::set(const std::string& name, Spectrum value)
 {
   if (spvalues.find(name) != spvalues.end()) {
-    throw std::runtime_error("spectrum value " + id + ":" + name + " redefined");
+    throw std::runtime_error("spectrum value " + id + ":" + name +
+                             " redefined");
   }
   spvalues[name] = value;
 }
@@ -163,6 +164,10 @@ std::vector<ValueBlock> read_valueblock_file(std::istream& istream)
 {
   ValueBlock* block = nullptr;
   std::vector<ValueBlock> blocks;
+
+  if (!istream.good()) {
+    throw std::runtime_error("attempting to read a bad file");
+  }
 
   while (true) {
     std::string token;

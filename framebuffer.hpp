@@ -19,5 +19,5 @@ public:
   Framebuffer(int xres, int yres);
 
   void add_sample(float x, float y, const pupumath::vec3 &v);
-  void save_ppm();
+  void save_ppm(const std::string& filename);
 };

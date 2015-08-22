@@ -182,11 +182,11 @@ std::shared_ptr<Material> build_material(const ValueBlock &block)
 {
   auto type = block.get<std::string>("type");
   if (type == "glass") {
-    return std::make_shared<Glass>(vec3(block.get<double>("ior")),
-                                   block.get<vec3>("absorbance"));
+    return std::make_shared<Glass>(block.get<Spectrum>("ior"),
+                                   block.get<Spectrum>("absorbance"));
   }
   else if (type == "matte") {
-    return std::make_shared<Matte>(vec3(block.get<double>("reflectance")));
+    return std::make_shared<Matte>(block.get<Spectrum>("reflectance"));
   }
   else {
     throw std::runtime_error("unknown material");

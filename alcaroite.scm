@@ -1,5 +1,23 @@
 (load "linalg.scm")
 
+(define spectrum-samples 10)
+
+(define (lerp x a b)
+  (+ (* (- 1 x) a) (* x b)))
+
+(define (lerp-lookup-indexed i-frac vals)
+  (cond ((= (length vals) 1)
+          (car vals))
+        ((<= i-frac 1)
+          (lerp i-frac (car vals) (cadr vals)))
+        (else
+          (lerp-lookup-indexed (- i-frac 1) (cdr vals)))))
+
+(define (lerp-lookup x vals)
+  (let* ((max-index (- (length vals) 1))
+         (i-frac (* x max-index)))
+    (lerp-lookup-indexed i-frac vals)))
+
 (define (flatten x)
   (cond ((null? x) '())
         ((list? x) (append (flatten (car x)) (flatten (cdr x))))
@@ -23,8 +41,10 @@
          (display (string-append
                     "mat "
                     (matrix->string v))))
-        ((list? v)
+        ((and (list? v) (= 3 (length v)))
          (display (string-append "vec " (vector->string v))))
+        ((and (list? v) (= spectrum-samples (length v)))
+         (display (string-append "spectrum " (vector->string v))))
         (else
           (display v))))
 
@@ -42,6 +62,19 @@
         (display-values (cddr args))))))
 
 (define (vec x y z) (list x y z))
+
+(define (spectrum . vals)
+  (cond ((= (length vals) spectrum-samples)
+         vals)
+        ((= (length vals) 1)
+         (duplicate-list (car vals) spectrum-samples))
+        (else
+          (error "Bad number of spectrum samples" vals))))
+
+(define (spectrum-linear . vals)
+  (map (lambda (i) (lerp-lookup (/ i (- spectrum-samples 1)) vals))
+    (range 0 spectrum-samples)))
+
 
 (define blocks '())
 (define (block type . values)
@@ -73,5 +106,4 @@
     (apply display-values values)))
 
 (define (finish) (for-each display-block blocks))
-
 

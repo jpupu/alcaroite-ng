@@ -1,3 +1,4 @@
+#include "camera.hpp"
 #include "framebuffer.hpp"
 #include "integrator.hpp"
 #include "material.hpp"
@@ -19,12 +20,12 @@
 #include <tclap/CmdLine.h>
 using namespace pupumath;
 
-Scene build_scene(const std::vector<ValueBlock> &blocks)
+Scene build_scene(const std::vector<ValueBlock>& blocks)
 {
   Scene scene;
   std::map<std::string, std::shared_ptr<Material>> materials;
   std::map<std::string, std::shared_ptr<Shape>> shapes;
-  for (const auto &block : blocks) {
+  for (const auto& block : blocks) {
 
     if (block.type == "material") {
       materials[block.id] = build_material(block);
@@ -44,11 +45,14 @@ Scene build_scene(const std::vector<ValueBlock> &blocks)
                                {block.get<mat34>("transform"),
                                 block.get<mat34>("inverse_transform")}});
     }
+    else if (block.type == "camera") {
+      scene.camera = build_camera(block);
+    }
   }
   return scene;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
 
   // vec3 wo = normalize(vec3(-1,0,-1));
@@ -83,7 +87,7 @@ int main(int argc, char *argv[])
 
   std::ifstream infile(input_file_arg.getValue());
   auto blocks = read_valueblock_file(infile);
-  for (const auto &block : blocks) {
+  for (const auto& block : blocks) {
     std::cout << block;
   }
   Scene scene = build_scene(blocks);
@@ -93,7 +97,6 @@ int main(int argc, char *argv[])
   int S = samples_arg.getValue();
   printf("Rendering %dx%d with %d samples/pixel\n", W, H, S);
   Framebuffer framebuffer(W, H);
-  vec3 origin = vec3(0, 0.3, 2);
   Sampler sampler = Sampler(S);
   sampler.generate();
   auto start = std::chrono::system_clock::now();
@@ -112,11 +115,11 @@ int main(int argc, char *argv[])
       for (int s = 0; s < S; s++) {
         // float wavelen = frand() * 380 + 420;
         float wavelen = sampler.wavelen[s]; // frand() * 380 + 420;
-        vec3 direction =
-            normalize(vec3(float(x + sampler.lens[s].x) / W * 2 - 1,
-                           -(float(y + sampler.lens[s].y) / H * 2 - 1), -1));
-
-        Ray ray = {origin, direction, 1000.0, nullptr};
+        CameraSample camsamp =
+            scene.camera->project(vec3{(float(x + .5) / W * 2 - 1) * W / H,
+                                       -(float(y + .5) / H * 2 - 1), 0},
+                                  wavelen, sampler.lens[s]);
+        Ray ray = {camsamp.origin, camsamp.direction, 1000.0, nullptr};
         float L = radiance(scene, ray, wavelen, sampler, s);
 // printf("--> L=%f\n", L);
 #ifdef SINGLE

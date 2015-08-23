@@ -91,6 +91,9 @@
 (define (skybox skybox-type . values)
   (apply block (append (list "skybox" "type" skybox-type) values)))
 
+(define (camera camera-type . values)
+  (apply block (append (list "camera" "type" camera-type) values)))
+
 (define (object . values)
   (apply block (append '("object") values)))
 

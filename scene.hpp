@@ -6,6 +6,7 @@
 class Shape;
 class Material;
 class Skybox;
+class Camera;
 
 class GeometricObject {
 public:
@@ -22,4 +23,5 @@ public:
 struct Scene {
   std::vector<GeometricObject> objects;
   std::shared_ptr<Skybox> skybox;
+  std::shared_ptr<Camera> camera;
 };

@@ -16,5 +16,10 @@
 
 (skybox "fancy")
 
+(camera "pinhole"
+  "fov" 90
+  "transform" (translate 0 .3 2)
+  "inverse_transform" (inverse (translate 0 .3 2)))
+
 (finish)
 

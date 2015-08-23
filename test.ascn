@@ -1,13 +1,13 @@
 
 material _mat0
 :: type glass
-:: ior 1.5
-:: absorbance vec 9 1 9
+:: ior spectrum 1.5 1.5 1.5 1.5 1.5 1.5 1.5 1.5 1.5 1.5
+:: absorbance spectrum 9 8 6 3 1 3 5 6 8 9
 .
 
 material _mat1
 :: type matte
-:: reflectance .8
+:: reflectance spectrum .8 .8 .8 .8 .8 .8 .8 .8 .8 .8
 .
 
 shape _shape0
@@ -36,5 +36,12 @@ object _obj1
 
 skybox _sb0
 :: type fancy
+.
+
+camera _cam0
+:: type pinhole
+:: fov 90
+:: transform mat 1 0 0 0  0 1 0 .3  0 0 1 2
+:: inverse_transform mat 1 0 0 0  0 1 0 -.3  0 0 1 -2
 .
 

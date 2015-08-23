@@ -12,13 +12,13 @@ float Material::absorb(float t, float wavelen) const
 
 float brdf_lambertian(const vec3 &wo, vec3 &wi, float &pdf, float u1, float u2)
 {
-  // // Cosine-weigted sampling.
-  // wi = sample_hemisphere_cosine(u1, u2);
-  // pdf = cos_theta(wi) / M_PI;
+  // Cosine-weighted sampling.
+  wi = sample_hemisphere_cosine(u1, u2);
+  pdf = cos_theta(wi) / M_PI;
 
-  // Uniform sampling.
-  wi = sample_hemisphere(u1, u2);
-  pdf = 1 / (2 * M_PI);
+  // // Uniform sampling.
+  // wi = sample_hemisphere(u1, u2);
+  // pdf = 1 / (2 * M_PI);
 
   return 1.0 / M_PI;
   ;

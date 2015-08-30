@@ -37,8 +37,8 @@ Camera::Camera(Transform cam_to_world) : cam_to_world(cam_to_world) {}
 
 std::shared_ptr<Camera> build_camera(const ValueBlock& block)
 {
-  Transform xform = {block.get<mat34>("transform"),
-                     block.get<mat34>("inverse_transform")};
+  auto xform_matrix = block.get<mat34>("transform");
+  Transform xform = {xform_matrix, inverse(xform_matrix)};
 
   auto type = block.get<std::string>("type");
   if (type == "pinhole") {

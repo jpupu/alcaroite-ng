@@ -5,114 +5,443 @@
 #include <cmath>
 
 namespace pupumath {
-inline vec3 operator-(const vec3 &a) { return vec3{-a.x, -a.y, -a.z}; }
 
-inline vec3 operator+(const vec3 &a, const vec3 &b)
+//// vec2 //////////////////////////////////////////////////////
+
+inline vec2 operator-(const vec2& a) { return vec2{-a.x, -a.y}; }
+
+inline vec2 operator+(const vec2& a, const vec2& b)
+{
+  return vec2{a.x + b.x, a.y + b.y};
+}
+
+inline vec2 operator-(const vec2& a, const vec2& b)
+{
+  return vec2{a.x - b.x, a.y - b.y};
+}
+
+inline vec2 operator*(const vec2& a, float f) { return vec2{a.x * f, a.y * f}; }
+
+inline vec2 operator*(float f, const vec2& a) { return a * f; }
+
+inline vec2 operator/(const vec2& a, float f) { return vec2{a.x / f, a.y / f}; }
+
+inline vec2 operator/(float f, const vec2& a) { return vec2{f / a.x, f / a.y}; }
+
+inline float dot(const vec2& a, const vec2& b) { return a.x * b.x + a.y * b.y; }
+
+inline float norm_sq(const vec2& v) { return dot(v, v); }
+
+inline float norm(const vec2& v) { return std::sqrt(dot(v, v)); }
+
+inline vec2 normalize(const vec2& v) { return v / norm(v); }
+
+//// vec3 //////////////////////////////////////////////////////
+
+inline vec3 operator-(const vec3& a) { return vec3{-a.x, -a.y, -a.z}; }
+
+inline vec3 operator+(const vec3& a, const vec3& b)
 {
   return vec3{a.x + b.x, a.y + b.y, a.z + b.z};
 }
 
-inline vec3 operator-(const vec3 &a, const vec3 &b)
+inline vec3 operator-(const vec3& a, const vec3& b)
 {
   return vec3{a.x - b.x, a.y - b.y, a.z - b.z};
 }
 
-inline vec3 operator*(const vec3 &a, float f)
+inline vec3 operator*(const vec3& a, float f)
 {
   return vec3{a.x * f, a.y * f, a.z * f};
 }
 
-inline vec3 operator*(float f, const vec3 &a) { return a * f; }
+inline vec3 operator*(float f, const vec3& a) { return a * f; }
 
-inline vec3 operator/(const vec3 &a, float f)
+inline vec3 operator/(const vec3& a, float f)
 {
   return vec3{a.x / f, a.y / f, a.z / f};
 }
 
-inline vec3 operator/(float f, const vec3 &a) { return a / f; }
+inline vec3 operator/(float f, const vec3& a) { return a / f; }
 
-inline float dot(const vec3 &a, const vec3 &b)
+inline float dot(const vec3& a, const vec3& b)
 {
   return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-inline vec3 cross(const vec3 &a, const vec3 &b)
+inline vec3 cross(const vec3& a, const vec3& b)
 {
   return vec3{a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
               a[0] * b[1] - a[1] * b[0]};
 }
 
-inline float norm_sq(const vec3 &v) { return dot(v, v); }
+inline float norm_sq(const vec3& v) { return dot(v, v); }
 
-inline float norm(const vec3 &v) { return std::sqrt(dot(v, v)); }
+inline float norm(const vec3& v) { return std::sqrt(dot(v, v)); }
 
-inline vec3 normalize(const vec3 &v) { return v / norm(v); }
+inline vec3 normalize(const vec3& v) { return v / norm(v); }
 
+//// vec4 //////////////////////////////////////////////////////
+
+inline vec4 operator-(const vec4& a) { return vec4{-a.x, -a.y, -a.z, -a.w}; }
+
+inline vec4 operator+(const vec4& a, const vec4& b)
+{
+  return vec4{a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w};
+}
+
+inline vec4 operator-(const vec4& a, const vec4& b)
+{
+  return vec4{a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w};
+}
+
+inline vec4 operator*(const vec4& a, float f)
+{
+  return vec4{a.x * f, a.y * f, a.z * f, a.w * f};
+}
+
+inline vec4 operator*(float f, const vec4& a) { return a * f; }
+
+inline vec4 operator/(const vec4& a, float f)
+{
+  return vec4{a.x / f, a.y / f, a.z / f, a.w / f};
+}
+
+inline vec4 operator/(float f, const vec4& a)
+{
+  return vec4{f / a.x, f / a.y, f / a.z, f / a.w};
+}
+
+inline float dot(const vec4& a, const vec4& b)
+{
+  return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+}
+
+inline float norm_sq(const vec4& v) { return dot(v, v); }
+
+inline float norm(const vec4& v) { return std::sqrt(dot(v, v)); }
+
+inline vec4 normalize(const vec4& v) { return v / norm(v); }
+
+/// mat3 /////////////////////////////////////////////////
 // clang-format off
-inline
-vec3 mul (const mat34& m, const vec3& v)
-{
-  return vec3{ m[0]*v[0] + m[1]*v[1] +  m[2]*v[2] + m[3],
-               m[4]*v[0] + m[5]*v[1] +  m[6]*v[2] + m[7],
-               m[8]*v[0] + m[9]*v[1] + m[10]*v[2] + m[11] };
-}
 
 inline
-vec3 mul_rotation (const mat34& m, const vec3& v)
+mat3 transpose (const mat3& m)
 {
-  return vec3{ m[0]*v[0] + m[1]*v[1] +  m[2]*v[2],
-               m[4]*v[0] + m[5]*v[1] +  m[6]*v[2],
-               m[8]*v[0] + m[9]*v[1] + m[10]*v[2] };
-}
-
-inline
-vec3 mul_rotation_transpose (const mat34& m, const vec3& v)
-{
-  return vec3{ m[0]*v[0] + m[4]*v[1] +  m[8]*v[2],
-               m[1]*v[0] + m[5]*v[1] +  m[9]*v[2],
-               m[2]*v[0] + m[6]*v[1] + m[10]*v[2] };
-}
-
-inline
-mat34 transpose_rotation (const mat34& a)
-{
-  return mat34{{
-      a[0], a[4], a[8], 0,
-      a[1], a[5], a[9], 0,
-      a[2], a[6], a[10], 0,
+  return mat3{{
+      m(0,0), m(1,0), m(2,0),
+      m(0,1), m(1,1), m(2,1),
+      m(0,2), m(1,2), m(2,2),
   }};
 }
 
-// 0 1 2  3      0 1 2  3 
-// 4 5 6  7   x  4 5 6  7
-// 8 9 10 11     8 9 10 11
-// _ _ _  I      _ _ _  I
+inline
+mat3 mul (const mat3& a, const mat3& b)
+{
+  return mat3{{
+      a(0,0)*b(0,0) + a(0,1)*b(1,0) + a(0,2)*b(2,0),
+      a(0,0)*b(0,1) + a(0,1)*b(1,1) + a(0,2)*b(2,1),
+      a(0,0)*b(0,2) + a(0,1)*b(1,2) + a(0,2)*b(2,2),
+
+      a(1,0)*b(0,0) + a(1,1)*b(1,0) + a(1,2)*b(2,0),
+      a(1,0)*b(0,1) + a(1,1)*b(1,1) + a(1,2)*b(2,1),
+      a(1,0)*b(0,2) + a(1,1)*b(1,2) + a(1,2)*b(2,2),
+
+      a(2,0)*b(0,0) + a(2,1)*b(1,0) + a(2,2)*b(2,0),
+      a(2,0)*b(0,1) + a(2,1)*b(1,1) + a(2,2)*b(2,1),
+      a(2,0)*b(0,2) + a(2,1)*b(1,2) + a(2,2)*b(2,2),
+  }};
+}
+
+inline
+vec3 mul (const mat3& m, const vec3 v)
+{
+  return vec3{
+      m(0,0)*v[0] + m(0,1)*v[1] + m(0,2)*v[2],
+      m(1,0)*v[0] + m(1,1)*v[1] + m(1,2)*v[2],
+      m(2,0)*v[0] + m(2,1)*v[1] + m(2,2)*v[2],
+  };
+}
+
+inline
+vec3 mul_transpose (const mat3& m, const vec3 v)
+{
+  return vec3{
+      m(0,0)*v[0] + m(1,0)*v[1] + m(2,0)*v[2],
+      m(0,1)*v[0] + m(1,1)*v[1] + m(2,1)*v[2],
+      m(0,2)*v[0] + m(1,2)*v[1] + m(2,2)*v[2],
+  };
+}
+
+inline
+mat3 operator* (const mat3& a, const mat3& b)
+{
+  return mul(a, b);
+}
+
+inline
+mat3 mul (const mat3& a, float b)
+{
+  mat3 res;
+  for (int i = 0; i < 9; i++) res[i] = a[i] * b;
+  return res;
+}
+
+inline
+mat3 operator* (const mat3& a, float b)
+{
+  return mul(a, b);
+}
+
+inline
+mat3 operator* (float b, const mat3& a)
+{
+  return mul(a, b);
+}
+
+inline
+float determinant (const mat3& m)
+{
+  return
+        m(0,0)*m(1,1)*m(2,2) + m(0,1)*m(1,2)*m(2,0)
+      + m(0,2)*m(1,0)*m(2,1) - m(0,0)*m(1,2)*m(2,1)
+      - m(0,1)*m(1,0)*m(2,2) - m(0,2)*m(1,1)*m(2,0);
+}
+
+inline
+mat3 inverse (const mat3& m)
+{
+  float det = determinant(m);
+  return mat3{{
+      (m(1,1)*m(2,2) - m(1,2)*m(2,1))/det,
+      (m(0,2)*m(2,1) - m(0,1)*m(2,2))/det,
+      (m(0,1)*m(1,2) - m(0,2)*m(1,1))/det,
+      (m(1,2)*m(2,0) - m(1,0)*m(2,2))/det,
+      (m(0,0)*m(2,2) - m(0,2)*m(2,0))/det,
+      (m(0,2)*m(1,0) - m(0,0)*m(1,2))/det,
+      (m(1,0)*m(2,1) - m(1,1)*m(2,0))/det,
+      (m(0,1)*m(2,0) - m(0,0)*m(2,1))/det,
+      (m(0,0)*m(1,1) - m(0,1)*m(1,0))/det,
+  }};
+};
+
+
+/// mat4 /////////////////////////////////////////////////
+
+inline
+mat4 transpose (const mat4& m)
+{
+  return mat4{{
+      m(0,0), m(1,0), m(2,0), m(3,0),
+      m(0,1), m(1,1), m(2,1), m(3,1),
+      m(0,2), m(1,2), m(2,2), m(3,2),
+      m(0,3), m(1,3), m(2,3), m(3,3),
+  }};
+}
+
+inline
+mat4 mul (const mat4& a, const mat4& b)
+{
+  return mat4{{
+      a(0,0)*b(0,0) + a(0,1)*b(1,0) + a(0,2)*b(2,0) + a(0,3)*b(3,0),
+      a(0,0)*b(0,1) + a(0,1)*b(1,1) + a(0,2)*b(2,1) + a(0,3)*b(3,1),
+      a(0,0)*b(0,2) + a(0,1)*b(1,2) + a(0,2)*b(2,2) + a(0,3)*b(3,2),
+      a(0,0)*b(0,3) + a(0,1)*b(1,3) + a(0,2)*b(2,3) + a(0,3)*b(3,3),
+
+      a(1,0)*b(0,0) + a(1,1)*b(1,0) + a(1,2)*b(2,0) + a(1,3)*b(3,0),
+      a(1,0)*b(0,1) + a(1,1)*b(1,1) + a(1,2)*b(2,1) + a(1,3)*b(3,1),
+      a(1,0)*b(0,2) + a(1,1)*b(1,2) + a(1,2)*b(2,2) + a(1,3)*b(3,2),
+      a(1,0)*b(0,3) + a(1,1)*b(1,3) + a(1,2)*b(2,3) + a(1,3)*b(3,3),
+
+      a(2,0)*b(0,0) + a(2,1)*b(1,0) + a(2,2)*b(2,0) + a(2,3)*b(3,0),
+      a(2,0)*b(0,1) + a(2,1)*b(1,1) + a(2,2)*b(2,1) + a(2,3)*b(3,1),
+      a(2,0)*b(0,2) + a(2,1)*b(1,2) + a(2,2)*b(2,2) + a(2,3)*b(3,2),
+      a(2,0)*b(0,3) + a(2,1)*b(1,3) + a(2,2)*b(2,3) + a(2,3)*b(3,3),
+
+      a(3,0)*b(0,0) + a(3,1)*b(1,0) + a(3,2)*b(2,0) + a(3,3)*b(3,0),
+      a(3,0)*b(0,1) + a(3,1)*b(1,1) + a(3,2)*b(2,1) + a(3,3)*b(3,1),
+      a(3,0)*b(0,2) + a(3,1)*b(1,2) + a(3,2)*b(2,2) + a(3,3)*b(3,2),
+      a(3,0)*b(0,3) + a(3,1)*b(1,3) + a(3,2)*b(2,3) + a(3,3)*b(3,3),
+  }};
+}
+
+inline
+vec4 mul (const mat4& m, const vec4 v)
+{
+  return vec4{
+      m(0,0)*v[0] + m(0,1)*v[1] + m(0,2)*v[2] + m(0,3)*v[3],
+      m(1,0)*v[0] + m(1,1)*v[1] + m(1,2)*v[2] + m(1,3)*v[3],
+      m(2,0)*v[0] + m(2,1)*v[1] + m(2,2)*v[2] + m(2,3)*v[3],
+      m(3,0)*v[0] + m(3,1)*v[1] + m(3,2)*v[2] + m(3,3)*v[3],
+  };
+}
+
+inline
+vec4 mul_transpose (const mat4& m, const vec4 v)
+{
+  return vec4{
+      m(0,0)*v[0] + m(1,0)*v[1] + m(2,0)*v[2] + m(3,0)*v[3],
+      m(0,1)*v[0] + m(1,1)*v[1] + m(2,1)*v[2] + m(3,1)*v[3],
+      m(0,2)*v[0] + m(1,2)*v[1] + m(2,2)*v[2] + m(3,2)*v[3],
+      m(0,3)*v[0] + m(1,3)*v[1] + m(2,3)*v[2] + m(3,3)*v[3],
+  };
+}
+
+inline
+mat4 operator* (const mat4& a, const mat4& b)
+{
+  return mul(a, b);
+}
+
+inline
+mat4 mul (const mat4& a, float b)
+{
+  mat4 res;
+  for (int i = 0; i < 16; i++) res[i] = a[i] * b;
+  return res;
+}
+
+inline
+mat4 operator* (const mat4& a, float b)
+{
+  return mul(a, b);
+}
+
+inline
+mat4 operator* (float b, const mat4& a)
+{
+  return mul(a, b);
+}
+
+inline
+float determinant (const mat4& m)
+{
+  return
+        m(0,3) * m(1,2) * m(2,1) * m(3,0)
+      - m(0,2) * m(1,3) * m(2,1) * m(3,0)
+      - m(0,3) * m(1,1) * m(2,2) * m(3,0)
+      + m(0,1) * m(1,3) * m(2,2) * m(3,0)
+      + m(0,2) * m(1,1) * m(2,3) * m(3,0)
+      - m(0,1) * m(1,2) * m(2,3) * m(3,0)
+
+      - m(0,3) * m(1,2) * m(2,0) * m(3,1)
+      + m(0,2) * m(1,3) * m(2,0) * m(3,1)
+      + m(0,3) * m(1,0) * m(2,2) * m(3,1)
+      - m(0,0) * m(1,3) * m(2,2) * m(3,1)
+      - m(0,2) * m(1,0) * m(2,3) * m(3,1)
+      + m(0,0) * m(1,2) * m(2,3) * m(3,1)
+
+      + m(0,3) * m(1,1) * m(2,0) * m(3,2)
+      - m(0,1) * m(1,3) * m(2,0) * m(3,2)
+      - m(0,3) * m(1,0) * m(2,1) * m(3,2)
+      + m(0,0) * m(1,3) * m(2,1) * m(3,2)
+      + m(0,1) * m(1,0) * m(2,3) * m(3,2)
+      - m(0,0) * m(1,1) * m(2,3) * m(3,2)
+
+      - m(0,2) * m(1,1) * m(2,0) * m(3,3)
+      + m(0,1) * m(1,2) * m(2,0) * m(3,3)
+      + m(0,2) * m(1,0) * m(2,1) * m(3,3)
+      - m(0,0) * m(1,2) * m(2,1) * m(3,3)
+      - m(0,1) * m(1,0) * m(2,2) * m(3,3)
+      + m(0,0) * m(1,1) * m(2,2) * m(3,3);
+}
+
+inline
+mat4 inverse (const mat4& m)
+{
+  auto mm = mat4{{
+      m(1,2)*m(2,3)*m(3,1) - m(1,3)*m(2,2)*m(3,1) + m(1,3)*m(2,1)*m(3,2) -
+          m(1,1)*m(2,3)*m(3,2) - m(1,2)*m(2,1)*m(3,3) + m(1,1)*m(2,2)*m(3,3),
+      m(0,3)*m(2,2)*m(3,1) - m(0,2)*m(2,3)*m(3,1) - m(0,3)*m(2,1)*m(3,2) +
+          m(0,1)*m(2,3)*m(3,2) + m(0,2)*m(2,1)*m(3,3) - m(0,1)*m(2,2)*m(3,3),
+      m(0,2)*m(1,3)*m(3,1) - m(0,3)*m(1,2)*m(3,1) + m(0,3)*m(1,1)*m(3,2) - m(0,1)*m(1,3)*m(3,2) - m(0,2)*m(1,1)*m(3,3) + m(0,1)*m(1,2)*m(3,3),
+      m(0,3)*m(1,2)*m(2,1) - m(0,2)*m(1,3)*m(2,1) - m(0,3)*m(1,1)*m(2,2) + m(0,1)*m(1,3)*m(2,2) + m(0,2)*m(1,1)*m(2,3) - m(0,1)*m(1,2)*m(2,3),
+      m(1,3)*m(2,2)*m(3,0) - m(1,2)*m(2,3)*m(3,0) - m(1,3)*m(2,0)*m(3,2) + m(1,0)*m(2,3)*m(3,2) + m(1,2)*m(2,0)*m(3,3) - m(1,0)*m(2,2)*m(3,3),
+      m(0,2)*m(2,3)*m(3,0) - m(0,3)*m(2,2)*m(3,0) + m(0,3)*m(2,0)*m(3,2) - m(0,0)*m(2,3)*m(3,2) - m(0,2)*m(2,0)*m(3,3) + m(0,0)*m(2,2)*m(3,3),
+      m(0,3)*m(1,2)*m(3,0) - m(0,2)*m(1,3)*m(3,0) - m(0,3)*m(1,0)*m(3,2) + m(0,0)*m(1,3)*m(3,2) + m(0,2)*m(1,0)*m(3,3) - m(0,0)*m(1,2)*m(3,3),
+      m(0,2)*m(1,3)*m(2,0) - m(0,3)*m(1,2)*m(2,0) + m(0,3)*m(1,0)*m(2,2) - m(0,0)*m(1,3)*m(2,2) - m(0,2)*m(1,0)*m(2,3) + m(0,0)*m(1,2)*m(2,3),
+      m(1,1)*m(2,3)*m(3,0) - m(1,3)*m(2,1)*m(3,0) + m(1,3)*m(2,0)*m(3,1) - m(1,0)*m(2,3)*m(3,1) - m(1,1)*m(2,0)*m(3,3) + m(1,0)*m(2,1)*m(3,3),
+      m(0,3)*m(2,1)*m(3,0) - m(0,1)*m(2,3)*m(3,0) - m(0,3)*m(2,0)*m(3,1) + m(0,0)*m(2,3)*m(3,1) + m(0,1)*m(2,0)*m(3,3) - m(0,0)*m(2,1)*m(3,3),
+      m(0,1)*m(1,3)*m(3,0) - m(0,3)*m(1,1)*m(3,0) + m(0,3)*m(1,0)*m(3,1) - m(0,0)*m(1,3)*m(3,1) - m(0,1)*m(1,0)*m(3,3) + m(0,0)*m(1,1)*m(3,3),
+      m(0,3)*m(1,1)*m(2,0) - m(0,1)*m(1,3)*m(2,0) - m(0,3)*m(1,0)*m(2,1) + m(0,0)*m(1,3)*m(2,1) + m(0,1)*m(1,0)*m(2,3) - m(0,0)*m(1,1)*m(2,3),
+      m(1,2)*m(2,1)*m(3,0) - m(1,1)*m(2,2)*m(3,0) - m(1,2)*m(2,0)*m(3,1) + m(1,0)*m(2,2)*m(3,1) + m(1,1)*m(2,0)*m(3,2) - m(1,0)*m(2,1)*m(3,2),
+      m(0,1)*m(2,2)*m(3,0) - m(0,2)*m(2,1)*m(3,0) + m(0,2)*m(2,0)*m(3,1) - m(0,0)*m(2,2)*m(3,1) - m(0,1)*m(2,0)*m(3,2) + m(0,0)*m(2,1)*m(3,2),
+      m(0,2)*m(1,1)*m(3,0) - m(0,1)*m(1,2)*m(3,0) - m(0,2)*m(1,0)*m(3,1) + m(0,0)*m(1,2)*m(3,1) + m(0,1)*m(1,0)*m(3,2) - m(0,0)*m(1,1)*m(3,2),
+      m(0,1)*m(1,2)*m(2,0) - m(0,2)*m(1,1)*m(2,0) + m(0,2)*m(1,0)*m(2,1) - m(0,0)*m(1,2)*m(2,1) - m(0,1)*m(1,0)*m(2,2) + m(0,0)*m(1,1)*m(2,2),
+  }};
+
+  return mm * (1 / determinant(m));
+};
+
+
+/// mat34 ////////////////////////////////////////////////
+
+inline
+mat34 transpose (const mat34& m)
+{
+  return mat34{{
+      m(0,0), m(1,0), m(2,0), 0,
+      m(0,1), m(1,1), m(2,1), 0,
+      m(0,2), m(1,2), m(2,2), 0,
+  }};
+}
 
 inline
 mat34 mul (const mat34& a, const mat34& b)
 {
   return mat34{{
-      a[0]*b[0] + a[1]*b[4] + a[2]*b[8],
-      a[0]*b[1] + a[1]*b[5] + a[2]*b[9],
-      a[0]*b[2] + a[1]*b[6] + a[2]*b[10],
-      a[0]*b[3] + a[1]*b[7] + a[2]*b[11] + a[3],
+      a(0,0)*b(0,0) + a(0,1)*b(1,0) + a(0,2)*b(2,0),
+      a(0,0)*b(0,1) + a(0,1)*b(1,1) + a(0,2)*b(2,1),
+      a(0,0)*b(0,2) + a(0,1)*b(1,2) + a(0,2)*b(2,2),
+      a(0,0)*b(0,3) + a(0,1)*b(1,3) + a(0,2)*b(2,3) + a(0,3),
 
-      a[4]*b[0] + a[5]*b[4] + a[6]*b[8],
-      a[4]*b[1] + a[5]*b[5] + a[6]*b[9],
-      a[4]*b[2] + a[5]*b[6] + a[6]*b[10],
-      a[4]*b[3] + a[5]*b[7] + a[6]*b[11] + a[7],
+      a(1,0)*b(0,0) + a(1,1)*b(1,0) + a(1,2)*b(2,0),
+      a(1,0)*b(0,1) + a(1,1)*b(1,1) + a(1,2)*b(2,1),
+      a(1,0)*b(0,2) + a(1,1)*b(1,2) + a(1,2)*b(2,2),
+      a(1,0)*b(0,3) + a(1,1)*b(1,3) + a(1,2)*b(2,3) + a(1,3),
 
-      a[8]*b[0] + a[9]*b[4] + a[10]*b[8],
-      a[8]*b[1] + a[9]*b[5] + a[10]*b[9],
-      a[8]*b[2] + a[9]*b[6] + a[10]*b[10],
-      a[8]*b[3] + a[9]*b[7] + a[10]*b[11] + a[11],
+      a(2,0)*b(0,0) + a(2,1)*b(1,0) + a(2,2)*b(2,0),
+      a(2,0)*b(0,1) + a(2,1)*b(1,1) + a(2,2)*b(2,1),
+      a(2,0)*b(0,2) + a(2,1)*b(1,2) + a(2,2)*b(2,2),
+      a(2,0)*b(0,3) + a(2,1)*b(1,3) + a(2,2)*b(2,3) + a(2,3),
   }};
+}
+
+inline
+vec3 mul (const mat34& m, const vec3 v)
+{
+  return vec3{
+      m(0,0)*v[0] + m(0,1)*v[1] + m(0,2)*v[2] + m(0,3),
+      m(1,0)*v[0] + m(1,1)*v[1] + m(1,2)*v[2] + m(1,3),
+      m(2,0)*v[0] + m(2,1)*v[1] + m(2,2)*v[2] + m(2,3),
+  };
+}
+
+inline
+vec3 mul_3x3 (const mat34& m, const vec3 v)
+{
+  return vec3{
+      m(0,0)*v[0] + m(0,1)*v[1] + m(0,2)*v[2],
+      m(1,0)*v[0] + m(1,1)*v[1] + m(1,2)*v[2],
+      m(2,0)*v[0] + m(2,1)*v[1] + m(2,2)*v[2],
+  };
+}
+
+inline
+vec3 mul_3x3_transpose (const mat34& m, const vec3 v)
+{
+  return vec3{
+      m(0,0)*v[0] + m(1,0)*v[1] + m(2,0)*v[2],
+      m(0,1)*v[0] + m(1,1)*v[1] + m(2,1)*v[2],
+      m(0,2)*v[0] + m(1,2)*v[1] + m(2,2)*v[2],
+  };
 }
 
 inline
 mat34 operator* (const mat34& a, const mat34& b)
 {
-    return mul(a, b);
+  return mul(a, b);
 }
 
 inline
@@ -130,39 +459,43 @@ mat34 operator* (const mat34& a, float b)
 }
 
 inline
-mat34 inverse_rotation (const mat34& a)
+mat34 operator* (float b, const mat34& a)
 {
-  // http://www.mathsisfun.com/algebra/matrix-inverse-minors-cofactors-adjugate.html
-
-  mat34 minors = {{
-      a[5]*a[10] - a[6]*a[9],
-      a[4]*a[10] - a[6]*a[8],
-      a[4]*a[9]  - a[5]*a[8],
-      0,
-
-      a[1]*a[10] - a[2]*a[9],
-      a[0]*a[10] - a[2]*a[8],
-      a[0]*a[9]  - a[1]*a[8],
-      0,
-
-      a[1]*a[6]  - a[2]*a[5],
-      a[0]*a[6]  - a[2]*a[4],
-      a[0]*a[5]  - a[1]*a[4],
-      0,
-  }};
-
-  mat34 cofactors = {{
-       minors[0], -minors[1],  minors[2], 0,
-      -minors[4],  minors[5], -minors[6], 0,
-       minors[8], -minors[9],  minors[10], 0,  
-  }};
-
-  mat34 adjugate = transpose_rotation(cofactors);
-
-  float det = a[0]*minors[0] - a[1]*minors[1] + a[2]*minors[2];
-
-  return adjugate * (1/det);
+  return mul(a, b);
 }
+
+inline
+float determinant (const mat34& m)
+{
+  return
+      - m(0,2) * m(1,1) * m(2,0)
+      + m(0,1) * m(1,2) * m(2,0)
+      + m(0,2) * m(1,0) * m(2,1)
+      - m(0,0) * m(1,2) * m(2,1)
+      - m(0,1) * m(1,0) * m(2,2)
+      + m(0,0) * m(1,1) * m(2,2);
+}
+
+inline
+mat34 inverse (const mat34& m)
+{
+  auto mm = mat34{{
+      -m(1,2)*m(2,1) + m(1,1)*m(2,2),
+      + m(0,2)*m(2,1) - m(0,1)*m(2,2),
+      -m(0,2)*m(1,1) + m(0,1)*m(1,2),
+      m(0,3)*m(1,2)*m(2,1) - m(0,2)*m(1,3)*m(2,1) - m(0,3)*m(1,1)*m(2,2) + m(0,1)*m(1,3)*m(2,2) + m(0,2)*m(1,1)*m(2,3) - m(0,1)*m(1,2)*m(2,3),
+      + m(1,2)*m(2,0) - m(1,0)*m(2,2),
+      -m(0,2)*m(2,0) + m(0,0)*m(2,2),
+      + m(0,2)*m(1,0) - m(0,0)*m(1,2),
+      m(0,2)*m(1,3)*m(2,0) - m(0,3)*m(1,2)*m(2,0) + m(0,3)*m(1,0)*m(2,2) - m(0,0)*m(1,3)*m(2,2) - m(0,2)*m(1,0)*m(2,3) + m(0,0)*m(1,2)*m(2,3),
+      -m(1,1)*m(2,0) + m(1,0)*m(2,1),
+      + m(0,1)*m(2,0) - m(0,0)*m(2,1),
+      -m(0,1)*m(1,0) + m(0,0)*m(1,1),
+      m(0,3)*m(1,1)*m(2,0) - m(0,1)*m(1,3)*m(2,0) - m(0,3)*m(1,0)*m(2,1) + m(0,0)*m(1,3)*m(2,1) + m(0,1)*m(1,0)*m(2,3) - m(0,0)*m(1,1)*m(2,3),
+  }};
+
+  return mm * (1 / determinant(m));
+};
 
 /// Inverse of a matrix consisting of rotation and translation (no scaling)
 inline
@@ -172,58 +505,59 @@ mat34 inverse_noscale (const mat34& a)
   // http://graphics.stanford.edu/courses/cs248-98-fall/Final/q4.html
 
   return mat34{{
-      a[0], a[4], a[8],  -a[0]*a[3] - a[4]*a[7] - a[8]*a[11],
-      a[1], a[5], a[9],  -a[1]*a[3] - a[5]*a[7] - a[9]*a[11],
-      a[2], a[6], a[10], -a[2]*a[3] - a[6]*a[7] - a[10]*a[11],
+      a(0,0), a(1,0), a(2,0), -a(0,0)*a(0,3) - a(1,0)*a(1,3) - a(2,0)*a(2,3),
+      a(0,1), a(1,1), a(2,1), -a(0,1)*a(0,3) - a(1,1)*a(1,3) - a(2,1)*a(2,3),
+      a(0,2), a(1,2), a(2,2), -a(0,2)*a(0,3) - a(1,2)*a(1,3) - a(2,2)*a(2,3),
   }};
 }
+
 // clang-format on
 
-inline vec3 transform_point(const Transform &t, const vec3 &p)
+inline vec3 transform_point(const Transform& t, const vec3& p)
 {
   return mul(t.M, p);
 }
 
-inline vec3 transform_vector(const Transform &t, const vec3 &p)
+inline vec3 transform_vector(const Transform& t, const vec3& p)
 {
-  return mul_rotation(t.M, p);
+  return mul_3x3(t.M, p);
 }
 
-inline vec3 transform_normal(const Transform &t, const vec3 &p)
+inline vec3 transform_normal(const Transform& t, const vec3& p)
 {
-  return mul_rotation_transpose(t.Minv, p);
+  return mul_3x3_transpose(t.Minv, p);
 }
 
-inline vec3 inverse_transform_point(const Transform &t, const vec3 &p)
+inline vec3 inverse_transform_point(const Transform& t, const vec3& p)
 {
   return mul(t.Minv, p);
 }
 
-inline vec3 inverse_transform_vector(const Transform &t, const vec3 &p)
+inline vec3 inverse_transform_vector(const Transform& t, const vec3& p)
 {
-  return mul_rotation(t.Minv, p);
+  return mul_3x3(t.Minv, p);
 }
 
-inline vec3 inverse_transform_normal(const Transform &t, const vec3 &p)
+inline vec3 inverse_transform_normal(const Transform& t, const vec3& p)
 {
-  return mul_rotation_transpose(t.M, p);
+  return mul_3x3_transpose(t.M, p);
 }
 
-inline Transform mul(const Transform &a, const Transform &b)
+inline Transform mul(const Transform& a, const Transform& b)
 {
   return {a.M * b.M, b.Minv * a.Minv};
 }
 
-inline Transform operator*(const Transform &a, const Transform &b)
+inline Transform operator*(const Transform& a, const Transform& b)
 {
   return mul(a, b);
 }
 
-inline Transform inverse(const Transform &t) { return {t.Minv, t.M}; }
+inline Transform inverse(const Transform& t) { return {t.Minv, t.M}; }
 
 namespace new_transform {
 // clang-format off
-#pragma GCC diagnostic ignored "-Wunused-function" 
+#pragma GCC diagnostic ignored "-Wunused-function"
 
   static Transform ident ()
   {
@@ -278,7 +612,7 @@ namespace new_transform {
         0, cos_t, -sin_t, 0,
         0, sin_t,  cos_t, 0,
     }};
-    return { m, transpose_rotation(m) };
+    return { m, transpose(m) };
   }
 
   static Transform rotate_y (float angle_deg)
@@ -290,7 +624,7 @@ namespace new_transform {
              0, 1,     0, 0,
         -sin_t, 0, cos_t, 0,
     }};
-    return { m, transpose_rotation(m) };
+    return { m, transpose(m) };
   }
 
   static Transform rotate_z (float angle_deg)
@@ -302,7 +636,7 @@ namespace new_transform {
         sin_t,  cos_t, 0, 0,
             0,      0, 1, 0,
     }};
-    return { m, transpose_rotation(m) };
+    return { m, transpose(m) };
   }
 
   static Transform rotate (float angle_deg, const vec3& axis)
@@ -326,7 +660,7 @@ namespace new_transform {
         a.z * a.z               + (1 - a.z * a.z) * cos_t,
         0,
     }};
-    return { m, transpose_rotation(m) };
+    return { m, transpose(m) };
   }
 
   static Transform look_at (const vec3& eye, const vec3& target, const vec3& up)

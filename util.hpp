@@ -11,7 +11,7 @@ inline float frand()
   return static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
 }
 
-inline pupumath::mat34 basis_from_normal(const pupumath::vec3 &normal)
+inline pupumath::mat3 basis_from_normal(const pupumath::vec3 &normal)
 {
   pupumath::vec3 tangent0;
   float ax = fabs(normal.x);
@@ -43,9 +43,9 @@ inline pupumath::mat34 basis_from_normal(const pupumath::vec3 &normal)
   pupumath::vec3 tangent = cross(bitangent, normal);
 
   // clang-format off
-  return {{ tangent.x, bitangent.x, normal.x, 0,
-            tangent.y, bitangent.y, normal.y, 0,
-            tangent.z, bitangent.z, normal.z, 0 }};
+  return {{ tangent.x, bitangent.x, normal.x,
+            tangent.y, bitangent.y, normal.y,
+            tangent.z, bitangent.z, normal.z, }};
   // clang-format on
 }
 

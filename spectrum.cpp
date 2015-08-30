@@ -61,23 +61,23 @@ vec3 spectrum_sample_to_xyz(float wavelength, float amplitude)
 vec3 xyz_to_linear_rgb(const vec3 &xyz)
 {
   // clang-format off
-  static constexpr mat34 M = {{
-       3.2406, -1.5372, -0.4986, 0,
-      -0.9689,  1.8758,  0.0415, 0,
-       0.0557, -0.2040,  1.0570, 0, }};
+  static constexpr mat3 M = {{
+       3.2406, -1.5372, -0.4986,
+      -0.9689,  1.8758,  0.0415,
+       0.0557, -0.2040,  1.0570, }};
   // clang-format on
-  return mul_rotation(M, xyz);
+  return mul(M, xyz);
 }
 
 vec3 linear_rgb_to_xyz(const vec3 &rgb)
 {
   // clang-format off
-  static constexpr mat34 M = {{
-      0.4124, 0.3576, 0.1805, 0,
-      0.2126, 0.7152, 0.0722, 0,
-      0.0193, 0.1192, 0.9505, 0, }};
+  static constexpr mat3 M = {{
+      0.4124, 0.3576, 0.1805,
+      0.2126, 0.7152, 0.0722,
+      0.0193, 0.1192, 0.9505, }};
   // clang-format on
-  return mul_rotation(M, rgb);
+  return mul(M, rgb);
 }
 
 vec3 srgb_to_xyz(vec3 rgb)

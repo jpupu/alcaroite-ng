@@ -1,9 +1,42 @@
 
+(define (vec-op op v a)
+  (if (null? v) '()
+    (if (list? a)
+      (cons (op (car v) (car a)) (vec-op op (cdr v) (cdr a)))
+      (cons (op (car v) a) (vec-op op (cdr v) a)))))
+
+(define (vec+ v a) (vec-op + v a))
+(define (vec- v a) (vec-op - v a))
+(define (vec* v a) (vec-op * v a))
+(define (vec/ v a) (vec-op / v a))
+
+(define (neg xs)
+  (if (null? xs) '()
+    (cons (- 0 (car xs)) (neg (cdr xs)))))
 
 (define (dot a b)
   (if (null? a)
     0
     (+ (* (car a) (car b)) (dot (cdr a) (cdr b)))))
+
+(define (cross u v)
+  (let ((u1 (car u))
+        (u2 (cadr u))
+        (u3 (caddr u))
+        (v1 (car v))
+        (v2 (cadr v))
+        (v3 (caddr v)))
+    (list
+      (- (* u2 v3) (* u3 v2))
+      (- (* u3 v1) (* u1 v3))
+      (- (* u1 v2) (* u2 v1)))))
+
+
+(define (norm v)
+  (sqrt (dot v v)))
+
+(define (normalize v)
+  (vec/ v (norm v)))
 
 (define (pow x i)
   (if (= i 0) 1
@@ -129,5 +162,101 @@
     0 1 0 y
     0 0 1 z
     0 0 0 1))
+
+(define (rotate-x degrees)
+  (let* ((radians (* (/ degrees 180.0) pi))
+         (s (sin radians))
+         (c (cos radians)))
+    (matrix
+      1   0   0   0
+      0   c   -s  0
+      0   s   c   0
+      0   0   0   1)))
+
+(define (rotate-y degrees)
+  (let* ((radians (* (/ degrees 180.0) pi))
+         (s (sin radians))
+         (c (cos radians)))
+    (matrix
+      c   0   s   0
+      0   1   0   0
+      -s  0   c   0
+      0   0   0   1)))
+
+(define (rotate-z degrees)
+  (let* ((radians (* (/ degrees 180.0) pi))
+         (s (sin radians))
+         (c (cos radians)))
+    (matrix
+      c  -s   0   0
+      s   c   0   0
+      0   0   1   0
+      0   0   0   1)))
+
+(define (rotate axis degrees)
+  (let* ((radians (* (/ degrees 180.0) pi))
+         (s (sin radians))
+         (c (cos radians))
+         (1-c (- 1 c))
+         (u (normalize axis))
+         (x (car u))
+         (y (cadr u))
+         (z (caddr u)))
+    (matrix
+      (+ c (* ux ux 1-c))
+      (- (* x y 1-c) (* z s))
+      (+ (* x z 1-c) (* y s))
+      0
+      (+ (* y x 1-c) (* z s))
+      (+ c (* y y 1-c))
+      (- (* y z 1-c) (* x s))
+      0
+      (- (* z x 1-c) (* y s))
+      (+ (* z y 1-c) (* x s))
+      (+ c (* z z 1-c))
+      0
+      0 0 0 1)))
+
+(define (scale-x f)
+  (matrix
+    f 0 0 0
+    0 1 0 0
+    0 0 1 0
+    0 0 0 1))
+
+(define (scale-y f)
+  (matrix
+    1 0 0 0
+    0 f 0 0
+    0 0 1 0
+    0 0 0 1))
+
+(define (scale-z f)
+  (matrix
+    1 0 0 0
+    0 1 0 0
+    0 0 f 0
+    0 0 0 1))
+
+(define (scale f)
+  (matrix
+    f 0 0 0
+    0 f 0 0
+    0 0 f 0
+    0 0 0 1))
+
+(define (look-at eye center up)
+  (let* ((f (normalize (vec- center eye)))
+         (s (cross f (normalize up)))
+         (u (cross (normalize s) f))
+         (f0 (append f '(0)))
+         (s0 (append s '(0)))
+         (u0 (append u '(0)))
+         (M (list s0 u0 (neg f0) (list 0 0 0 1)))
+         (T (apply translate eye)))
+    (matrix-multiply T M)))
+
+
+
 
 

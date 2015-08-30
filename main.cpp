@@ -39,11 +39,11 @@ Scene build_scene(const std::vector<ValueBlock>& blocks)
     else if (block.type == "object") {
       auto shape = shapes.at(block.get<std::string>("shape"));
       auto material = materials.at(block.get<std::string>("material"));
+      auto xform_matrix = block.get<mat34>("transform");
       scene.objects.push_back({shape,
                                material,
                                static_cast<int>(block.get<double>("priority")),
-                               {block.get<mat34>("transform"),
-                                block.get<mat34>("inverse_transform")}});
+                               {xform_matrix, inverse(xform_matrix)}});
     }
     else if (block.type == "camera") {
       scene.camera = build_camera(block);

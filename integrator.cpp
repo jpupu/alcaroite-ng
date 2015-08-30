@@ -134,10 +134,10 @@ float radiance(const Scene &scene, Ray &ray, float wavelen, Sampler &sampler,
           interior.next_top()->mat->refractive_index.sample(wavelen);
     }
 
-    mat34 from_tangent = basis_from_normal(ray.normal);
-    mat34 to_tangent = inverse_rotation(from_tangent);
+    mat3 from_tangent = basis_from_normal(ray.normal);
+    mat3 to_tangent = inverse(from_tangent);
 
-    vec3 wo_t = mul_rotation(to_tangent, -ray.direction);
+    vec3 wo_t = mul(to_tangent, -ray.direction);
     // vec3 wi_t = vec3(0, 0, 1);
     // vec3 wi_t = vec3(-wo_t.x, -wo_t.y, wo_t.z);
     // vec3 sample = sampler.shading[sample_index];
@@ -147,7 +147,7 @@ float radiance(const Scene &scene, Ray &ray, float wavelen, Sampler &sampler,
     // float fr = brdf_lambertian(wo_t, wi_t, pdf, frand(), frand());
     float fr = ray.hit_object->mat->fr(
         wo_t, wi_t, wavelen, outer_refractive_index, pdf, frand(), frand());
-    wi_w = mul_rotation(from_tangent, wi_t);
+    wi_w = mul(from_tangent, wi_t);
 
     // SolidXyzCurveSpectrum R = { srgb_to_xyz(vec3{0.0, 1.0, 0.0}) };
     // Spectrum R = { 400, 700, {0,1,1,0} };

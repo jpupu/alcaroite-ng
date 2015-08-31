@@ -3,7 +3,7 @@
 #include <array>
 
 struct Spectrum {
-  static constexpr float min = 320;
+  static constexpr float min = 380;
   static constexpr float max = 720;
   static constexpr int count = 10;
   static constexpr float count_over_max_minus_min = count / (max - min);

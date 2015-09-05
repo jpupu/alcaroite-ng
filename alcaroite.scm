@@ -2,6 +2,12 @@
 
 (define spectrum-samples 10)
 
+(define (vec-list . vals)
+  (cons vec-list vals))
+
+(define (int-list . vals)
+  (cons int-list vals))
+
 (define (lerp x a b)
   (+ (* (- 1 x) a) (* x b)))
 
@@ -24,12 +30,12 @@
         (else (list x))))
 
 (define (matrix->string m)
-  (foldr 
-    (lambda (acc x) 
+  (foldr
+    (lambda (acc x)
       (string-append
-        acc 
-        (number->string x) 
-        " ")) 
+        acc
+        (number->string x)
+        " "))
     ""
     (flatten (transpose (drop-row m 3)))))
 
@@ -37,7 +43,19 @@
   (foldr (lambda (acc x) (string-append acc (number->string x) " ")) "" v))
 
 (define (display-value v)
-  (cond ((and (list? v) (list? (car v)))
+  (cond ((and (list? v) (eq? (car v) vec-list))
+         (display (string-append
+                    "veclist "
+                    (number->string (/ (- (length v) 1) 3))
+                    " "
+                    (vector->string (cdr v)))))
+        ((and (list? v) (eq? (car v) int-list))
+         (display (string-append
+                    "intlist "
+                    (number->string (- (length v) 1))
+                    " "
+                    (vector->string (cdr v)))))
+        ((and (list? v) (list? (car v)))
          (display (string-append
                     "mat "
                     (matrix->string v))))

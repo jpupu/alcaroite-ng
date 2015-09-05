@@ -15,6 +15,8 @@ struct ValueBlock {
   std::map<std::string, pupumath::vec3> vvalues;
   std::map<std::string, pupumath::mat34> mvalues;
   std::map<std::string, Spectrum> spvalues;
+  std::map<std::string, std::vector<pupumath::vec3>> lvvalues;
+  std::map<std::string, std::vector<int>> livalues;
 
   ValueBlock() {}
   ValueBlock(std::string type, std::string id);

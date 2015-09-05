@@ -4,105 +4,111 @@
 
 ValueBlock::ValueBlock(std::string type, std::string id) : type(type), id(id) {}
 
+template <typename T>
+T get_value(const std::string& name, const std::map<std::string, T>& map,
+            std::string type_name, std::string id)
+{
+  auto val = map.find(name);
+  if (val == map.end()) {
+    throw std::runtime_error("Value " + type_name + " '" + id + "::" + name +
+                             "' not found");
+  }
+  return val->second;
+}
+
 template <>
 std::string ValueBlock::get(const std::string& name) const
 {
-  auto val = svalues.find(name);
-  if (val == svalues.end()) {
-    throw std::runtime_error("string value " + id + ":" + name +
-                             " not defined");
-  }
-  return val->second;
+  return get_value(name, svalues, "string", id);
 }
 
 template <>
 double ValueBlock::get(const std::string& name) const
 {
-  auto val = nvalues.find(name);
-  if (val == nvalues.end()) {
-    throw std::runtime_error("double value " + id + ":" + name +
-                             " not defined");
-  }
-  return val->second;
+  return get_value(name, nvalues, "double", id);
 }
 
 template <>
 pupumath::vec3 ValueBlock::get(const std::string& name) const
 {
-  auto val = vvalues.find(name);
-  if (val == vvalues.end()) {
-    throw std::runtime_error("vector value " + id + ":" + name +
-                             " not defined");
-  }
-  return val->second;
+  return get_value(name, vvalues, "vector", id);
 }
 
 template <>
 pupumath::mat34 ValueBlock::get(const std::string& name) const
 {
-  auto val = mvalues.find(name);
-  if (val == mvalues.end()) {
-    throw std::runtime_error("matrix value " + id + ":" + name +
-                             " not defined");
-  }
-  return val->second;
+  return get_value(name, mvalues, "matrix", id);
 }
 
 template <>
 Spectrum ValueBlock::get(const std::string& name) const
 {
-  auto val = spvalues.find(name);
-  if (val == spvalues.end()) {
-    throw std::runtime_error("spectrum value " + id + ":" + name +
-                             " not defined");
+  return get_value(name, spvalues, "spectrum", id);
+}
+
+template <>
+std::vector<pupumath::vec3> ValueBlock::get(const std::string& name) const
+{
+  return get_value(name, lvvalues, "vector list", id);
+}
+
+template <>
+std::vector<int> ValueBlock::get(const std::string& name) const
+{
+  return get_value(name, livalues, "int list", id);
+}
+
+template <typename T>
+void set_value(const std::string& name, T value, std::map<std::string, T>& map,
+               std::string type_name, std::string id)
+{
+  if (map.find(name) != map.end()) {
+    throw std::runtime_error("Value " + type_name + " '" + id + "::" + name +
+                             "' redefined");
   }
-  return val->second;
+  map[name] = value;
 }
 
 template <>
 void ValueBlock::set(const std::string& name, std::string value)
 {
-  if (svalues.find(name) != svalues.end()) {
-    throw std::runtime_error("string value " + id + ":" + name + " redefined");
-  }
-  svalues[name] = value;
+  set_value(name, value, svalues, "string", id);
 }
 
 template <>
 void ValueBlock::set(const std::string& name, double value)
 {
-  if (nvalues.find(name) != nvalues.end()) {
-    throw std::runtime_error("double value " + id + ":" + name + " redefined");
-  }
-  nvalues[name] = value;
+  set_value(name, value, nvalues, "double", id);
 }
 
 template <>
 void ValueBlock::set(const std::string& name, pupumath::vec3 value)
 {
-  if (vvalues.find(name) != vvalues.end()) {
-    throw std::runtime_error("vector value " + id + ":" + name + " redefined");
-  }
-  vvalues[name] = value;
+  set_value(name, value, vvalues, "vector", id);
 }
 
 template <>
 void ValueBlock::set(const std::string& name, pupumath::mat34 value)
 {
-  if (mvalues.find(name) != mvalues.end()) {
-    throw std::runtime_error("matrix value " + id + ":" + name + " redefined");
-  }
-  mvalues[name] = value;
+  set_value(name, value, mvalues, "matrix", id);
 }
 
 template <>
 void ValueBlock::set(const std::string& name, Spectrum value)
 {
-  if (spvalues.find(name) != spvalues.end()) {
-    throw std::runtime_error("spectrum value " + id + ":" + name +
-                             " redefined");
-  }
-  spvalues[name] = value;
+  set_value(name, value, spvalues, "spectrum", id);
+}
+
+template <>
+void ValueBlock::set(const std::string& name, std::vector<pupumath::vec3> value)
+{
+  set_value(name, value, lvvalues, "vector list", id);
+}
+
+template <>
+void ValueBlock::set(const std::string& name, std::vector<int> value)
+{
+  set_value(name, value, livalues, "int list", id);
 }
 
 void ValueBlock::read_value(std::istream& istream)
@@ -132,6 +138,24 @@ void ValueBlock::read_value(std::istream& istream)
       istream >> v.samples[i];
     }
     set(name, v);
+  }
+  else if (val == "veclist") {
+    int count;
+    istream >> count;
+    std::vector<pupumath::vec3> vs(count);
+    for (auto& v : vs) {
+      istream >> v[0] >> v[1] >> v[2];
+    }
+    set(name, vs);
+  }
+  else if (val == "intlist") {
+    int count;
+    istream >> count;
+    std::vector<int> vs(count);
+    for (auto& v : vs) {
+      istream >> v;
+    }
+    set(name, vs);
   }
   else {
     set(name, val);

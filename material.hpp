@@ -7,16 +7,18 @@
 class Material {
 protected:
   Material()
-      : refractive_index(pupumath::vec3(1.0)), absorbance(pupumath::vec3(1.0))
+      : refractive_index(pupumath::vec3(1.0)), absorbance(pupumath::vec3(1.0)),
+        emittance(pupumath::vec3(0.0))
   {
   }
 
 public:
   Spectrum refractive_index;
   Spectrum absorbance;
+  Spectrum emittance;
 
-  virtual float fr(const pupumath::vec3 &wo, pupumath::vec3 &wi, float wavelen,
-                   float surrounding_refractive_index, float &pdf, float u1,
+  virtual float fr(const pupumath::vec3& wo, pupumath::vec3& wi, float wavelen,
+                   float surrounding_refractive_index, float& pdf, float u1,
                    float u2) const = 0;
 
   float absorb(float t, float wavelen) const;
@@ -24,4 +26,4 @@ public:
 
 class ValueBlock;
 
-std::shared_ptr<Material> build_material(const ValueBlock &);
+std::shared_ptr<Material> build_material(const ValueBlock&);

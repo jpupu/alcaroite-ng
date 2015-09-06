@@ -126,6 +126,7 @@ float radiance(const Scene &scene, Ray &ray, float wavelen, Sampler &sampler,
 
   vec3 wi_w;
   float factor;
+  float Le = 0.0f;
 
   if (true_intersection) {
     float outer_refractive_index = 1.0;
@@ -154,6 +155,8 @@ float radiance(const Scene &scene, Ray &ray, float wavelen, Sampler &sampler,
     Spectrum R(vec3(1, 1, 1));
 
     factor = R.sample(wavelen) * fr * abs_cos_theta(wi_t) / pdf;
+
+    Le = ray.hit_object->mat->emittance.sample(wavelen);
   }
   else {
     wi_w = ray.direction;
@@ -168,7 +171,7 @@ float radiance(const Scene &scene, Ray &ray, float wavelen, Sampler &sampler,
   float L = radiance(scene, next_ray, wavelen, sampler, sample_index,
                      nested + 1, interior);
 
-  return factor * absorbtion * L;
+  return factor * absorbtion * L + Le;
 }
 
 float radiance(const Scene &scene, Ray &ray, float wavelen, Sampler &sampler,

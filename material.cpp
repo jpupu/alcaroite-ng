@@ -10,7 +10,7 @@ float Material::absorb(float t, float wavelen) const
   return exp(-t * a);
 }
 
-float brdf_lambertian(const vec3 &wo, vec3 &wi, float &pdf, float u1, float u2)
+float brdf_lambertian(const vec3& wo, vec3& wi, float& pdf, float u1, float u2)
 {
   // Cosine-weighted sampling.
   wi = sample_hemisphere_cosine(u1, u2);
@@ -24,7 +24,7 @@ float brdf_lambertian(const vec3 &wo, vec3 &wi, float &pdf, float u1, float u2)
   ;
 }
 
-float brdf_perfect_specular_reflection(const vec3 &wo, vec3 &wi, float &pdf,
+float brdf_perfect_specular_reflection(const vec3& wo, vec3& wi, float& pdf,
                                        float u1, float u2)
 {
   wi = vec3{-wo.x, -wo.y, wo.z};
@@ -32,14 +32,14 @@ float brdf_perfect_specular_reflection(const vec3 &wo, vec3 &wi, float &pdf,
   return 1.0 / abs_cos_theta(wi);
 }
 
-float brdf_transparent(const vec3 &wo, vec3 &wi, float &pdf)
+float brdf_transparent(const vec3& wo, vec3& wi, float& pdf)
 {
   wi = -wo;
   pdf = 1.0;
   return 1.0 / abs_cos_theta(wi);
 }
 
-float bxdf_dielectric(const vec3 &wo, vec3 &wi, float &pdf, float n1, float n2)
+float bxdf_dielectric(const vec3& wo, vec3& wi, float& pdf, float n1, float n2)
 {
   // Assume that the ray always comes from n1 to n2, regardless of normal
   // direction.
@@ -106,12 +106,12 @@ float bxdf_dielectric(const vec3 &wo, vec3 &wi, float &pdf, float n1, float n2)
 
 class Matte : public Material {
 public:
-  Matte(const Spectrum &reflectance) : reflectance(reflectance) {}
+  Matte(const Spectrum& reflectance) : reflectance(reflectance) {}
 
   Spectrum reflectance;
 
-  float fr(const vec3 &wo, vec3 &wi, float wavelen,
-           float surrounding_refractive_index, float &pdf, float u1,
+  float fr(const vec3& wo, vec3& wi, float wavelen,
+           float surrounding_refractive_index, float& pdf, float u1,
            float u2) const
   {
     return reflectance.sample(wavelen) * brdf_lambertian(wo, wi, pdf, u1, u2);
@@ -120,12 +120,12 @@ public:
 
 class PerfectMirror : public Material {
 public:
-  PerfectMirror(const Spectrum &reflectance) : reflectance(reflectance) {}
+  PerfectMirror(const Spectrum& reflectance) : reflectance(reflectance) {}
 
   Spectrum reflectance;
 
-  float fr(const vec3 &wo, vec3 &wi, float wavelen,
-           float surrounding_refractive_index, float &pdf, float u1,
+  float fr(const vec3& wo, vec3& wi, float wavelen,
+           float surrounding_refractive_index, float& pdf, float u1,
            float u2) const
   {
     return reflectance.sample(wavelen) *
@@ -135,15 +135,15 @@ public:
 
 class Glass : public Material {
 public:
-  Glass(const Spectrum &refractive_index,
-        const Spectrum &absorbance = vec3(0.0))
+  Glass(const Spectrum& refractive_index,
+        const Spectrum& absorbance = vec3(0.0))
   {
     this->refractive_index = refractive_index;
     this->absorbance = absorbance;
   }
 
-  float fr(const vec3 &wo, vec3 &wi, float wavelen,
-           float surrounding_refractive_index, float &pdf, float u1,
+  float fr(const vec3& wo, vec3& wi, float wavelen,
+           float surrounding_refractive_index, float& pdf, float u1,
            float u2) const
   {
     float n1 = surrounding_refractive_index;
@@ -162,14 +162,14 @@ public:
     this->refractive_index = Spectrum(vec3(1.0));
     this->absorbance = vec3(0.0);
   }
-  Translucent(const Spectrum &absorbance)
+  Translucent(const Spectrum& absorbance)
   {
     this->refractive_index = Spectrum(vec3(1.0));
     this->absorbance = absorbance;
   }
 
-  float fr(const vec3 &wo, vec3 &wi, float wavelen,
-           float surrounding_refractive_index, float &pdf, float u1,
+  float fr(const vec3& wo, vec3& wi, float wavelen,
+           float surrounding_refractive_index, float& pdf, float u1,
            float u2) const
   {
     wi = -wo;
@@ -178,20 +178,28 @@ public:
   }
 };
 
-std::shared_ptr<Material> build_material(const ValueBlock &block)
+std::shared_ptr<Material> build_material(const ValueBlock& block)
 {
+  std::shared_ptr<Material> result;
   auto type = block.get<std::string>("type");
+
   if (type == "glass") {
-    return std::make_shared<Glass>(block.get<Spectrum>("ior"),
-                                   block.get<Spectrum>("absorbance"));
+    result = std::make_shared<Glass>(block.get<Spectrum>("ior"),
+                                     block.get<Spectrum>("absorbance"));
   }
   else if (type == "matte") {
-    return std::make_shared<Matte>(block.get<Spectrum>("reflectance"));
+    result = std::make_shared<Matte>(block.get<Spectrum>("reflectance"));
   }
   else if (type == "perfect-mirror") {
-    return std::make_shared<PerfectMirror>(block.get<Spectrum>("reflectance"));
+    result =
+        std::make_shared<PerfectMirror>(block.get<Spectrum>("reflectance"));
   }
   else {
-    throw std::runtime_error("unknown material");
+    throw std::runtime_error("unknown material '" + type + "'");
   }
+
+  if (block.has<Spectrum>("emittance")) {
+    result->emittance = block.get<Spectrum>("emittance");
+  }
+  return result;
 }

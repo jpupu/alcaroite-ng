@@ -50,36 +50,36 @@ out & entering
 
 class InteriorList {
 private:
-  std::vector<const GeometricObject *> list;
+  std::vector<const GeometricObject*> list;
 
 public:
-  bool has(const GeometricObject *obj) const
+  bool has(const GeometricObject* obj) const
   {
     const auto it = find(list.begin(), list.end(), obj);
     return it != list.end();
   }
 
-  const GeometricObject *top()
+  const GeometricObject* top()
   {
     if (list.size() == 0) return nullptr;
     return list.back();
   }
 
-  const GeometricObject *next_top()
+  const GeometricObject* next_top()
   {
     if (list.size() < 2) return nullptr;
     return list[list.size() - 2];
   }
 
-  void add(const GeometricObject *obj)
+  void add(const GeometricObject* obj)
   {
     list.push_back(obj);
     std::sort(list.begin(), list.end(),
-              [](const GeometricObject *a, const GeometricObject *b)
+              [](const GeometricObject* a, const GeometricObject* b)
                   -> bool { return a->priority < b->priority; });
   }
 
-  void remove(const GeometricObject *obj)
+  void remove(const GeometricObject* obj)
   {
     auto it = find(list.begin(), list.end(), obj);
     if (it != list.end()) {
@@ -92,12 +92,12 @@ public:
   size_t size() const { return list.size(); }
 };
 
-float radiance(const Scene &scene, Ray &ray, float wavelen, Sampler &sampler,
-               int sample_index, int nested, InteriorList &interior)
+float radiance(const Scene& scene, Ray& ray, float wavelen, Sampler& sampler,
+               int sample_index, int nested, InteriorList& interior)
 {
   if (nested > 100) return 0.0f;
   bool hit = false;
-  for (const auto &o : scene.objects) {
+  for (const auto& o : scene.objects) {
     Ray oray = {inverse_transform_point(o.xform, ray.origin),
                 inverse_transform_vector(o.xform, ray.direction), ray.tmax,
                 ray.originator};
@@ -174,7 +174,7 @@ float radiance(const Scene &scene, Ray &ray, float wavelen, Sampler &sampler,
   return factor * absorbtion * L + Le;
 }
 
-float radiance(const Scene &scene, Ray &ray, float wavelen, Sampler &sampler,
+float radiance(const Scene& scene, Ray& ray, float wavelen, Sampler& sampler,
                int sample_index)
 {
   InteriorList interior;

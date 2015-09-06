@@ -3,7 +3,7 @@
 #include <cmath>
 using namespace pupumath;
 
-Spectrum::Spectrum(const vec3 &linear_rgb)
+Spectrum::Spectrum(const vec3& linear_rgb)
     : samples(spectrum_ns::linear_rgb_to_spectrum(linear_rgb))
 {
 }
@@ -58,7 +58,7 @@ vec3 spectrum_sample_to_xyz(float wavelength, float amplitude)
               amplitude * zFit_1931(wavelength)};
 }
 
-vec3 xyz_to_linear_rgb(const vec3 &xyz)
+vec3 xyz_to_linear_rgb(const vec3& xyz)
 {
   // clang-format off
   static constexpr mat3 M = {{
@@ -69,7 +69,7 @@ vec3 xyz_to_linear_rgb(const vec3 &xyz)
   return mul(M, xyz);
 }
 
-vec3 linear_rgb_to_xyz(const vec3 &rgb)
+vec3 linear_rgb_to_xyz(const vec3& rgb)
 {
   // clang-format off
   static constexpr mat3 M = {{
@@ -88,11 +88,40 @@ vec3 srgb_to_xyz(vec3 rgb)
   return linear_rgb_to_xyz(rgb);
 }
 
-std::array<float, Spectrum::count> linear_rgb_to_spectrum(const vec3 &rgb)
+std::array<float, Spectrum::count> linear_rgb_to_spectrum(const vec3& rgb)
 {
+  // Original algorithm from:
   // http://www.cs.utah.edu/~bes/papers/color/
   // Smits, Brian: An RGB to Spectrum Conversion for Reflectances
+  //
+  // Modified to use automatically calculated spectrum curves.
+#if 1
+  static float white_spectrum[Spectrum::count];
+  static float red_spectrum[Spectrum::count];
+  static float yellow_spectrum[Spectrum::count];
+  static float green_spectrum[Spectrum::count];
+  static float cyan_spectrum[Spectrum::count];
+  static float blue_spectrum[Spectrum::count];
+  static float magenta_spectrum[Spectrum::count];
+  static bool inited = false;
 
+  if (!inited) {
+    for (int i = 0; i < Spectrum::count; i++) {
+      int wavelen =
+          Spectrum::min + (Spectrum::max - Spectrum::min) / Spectrum::count;
+      vec3 rgb_ = xyz_to_linear_rgb(spectrum_sample_to_xyz(wavelen, 1));
+      white_spectrum[i] = rgb_[0] + rgb_[1] + rgb_[2];
+      red_spectrum[i] = rgb_[0];
+      yellow_spectrum[i] = rgb_[0] + rgb_[1];
+      green_spectrum[i] = rgb_[1];
+      cyan_spectrum[i] = rgb_[1] + rgb_[2];
+      blue_spectrum[i] = rgb_[2];
+      magenta_spectrum[i] = rgb_[2] + rgb_[3];
+    }
+    inited = true;
+  }
+
+#else
   static float white_spectrum[Spectrum::count] = {1,     1, .9999, .9993, .9992,
                                                   .9998, 1, 1,     1,     1};
   static float red_spectrum[Spectrum::count] = {
@@ -107,15 +136,16 @@ std::array<float, Spectrum::count> linear_rgb_to_spectrum(const vec3 &rgb)
       1, 1, 0.8916, 0.3323, 0, 0, 0.0003, 0.0369, 0.0483, 0.0496};
   static float magenta_spectrum[Spectrum::count] = {
       1, 1, .9685, .2229, 0, 0.0458, 0.8369, 1, 1, 0.9959};
+#endif
 
-  std::array<float, Spectrum::count> spectrum = {
-      {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}};
+  std::array<float, Spectrum::count> spectrum;
+  spectrum.fill(0);
 
   float r = rgb[0];
   float g = rgb[1];
   float b = rgb[2];
 
-  auto add = [&spectrum](float scl, float *src) {
+  auto add = [&spectrum](float scl, float* src) {
     for (int i = 0; i < Spectrum::count; i++) {
       spectrum[i] += scl * src[i];
     }

@@ -150,11 +150,7 @@ float radiance(const Scene& scene, Ray& ray, float wavelen, Sampler& sampler,
         wo_t, wi_t, wavelen, outer_refractive_index, pdf, frand(), frand());
     wi_w = mul(from_tangent, wi_t);
 
-    // SolidXyzCurveSpectrum R = { srgb_to_xyz(vec3{0.0, 1.0, 0.0}) };
-    // Spectrum R = { 400, 700, {0,1,1,0} };
-    Spectrum R(vec3(1, 1, 1));
-
-    factor = R.sample(wavelen) * fr * abs_cos_theta(wi_t) / pdf;
+    factor = fr * abs_cos_theta(wi_t) / pdf;
 
     Le = ray.hit_object->mat->emittance.sample(wavelen);
   }

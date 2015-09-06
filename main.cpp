@@ -80,6 +80,7 @@ void test_spectrum()
       framebuffer.add_sample(x, y, lrgb);
     }
   }
+
   framebuffer.save_ppm("test_spectrum.ppm");
 }
 
@@ -124,9 +125,9 @@ int main(int argc, char* argv[])
 
   std::ifstream infile(input_file_arg.getValue());
   auto blocks = read_valueblock_file(infile);
-  for (const auto& block : blocks) {
-    std::cout << block;
-  }
+  // for (const auto& block : blocks) {
+  //   std::cout << block;
+  // }
   Scene scene = build_scene(blocks);
 
   int W = width_arg.getValue();

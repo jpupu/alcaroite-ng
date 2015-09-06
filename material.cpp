@@ -159,12 +159,12 @@ class Translucent : public Material {
 public:
   Translucent()
   {
-    this->refractive_index = Spectrum(vec3(1.0));
+    this->refractive_index = Spectrum(1.0);
     this->absorbance = vec3(0.0);
   }
   Translucent(const Spectrum& absorbance)
   {
-    this->refractive_index = Spectrum(vec3(1.0));
+    this->refractive_index = Spectrum(1.0);
     this->absorbance = absorbance;
   }
 

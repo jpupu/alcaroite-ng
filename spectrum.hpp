@@ -3,9 +3,9 @@
 #include <array>
 
 struct Spectrum {
-  static constexpr float min = 380;
-  static constexpr float max = 720;
-  static constexpr int count = 10;
+  static constexpr float min = 400;
+  static constexpr float max = 700;
+  static constexpr int count = 16;
   static constexpr float count_over_max_minus_min = count / (max - min);
 
   std::array<float, count> samples;
@@ -18,6 +18,7 @@ struct Spectrum {
 
   Spectrum() {}
   Spectrum(const pupumath::vec3 &linear_rgb);
+  Spectrum(float v) { samples.fill(v); }
 };
 
 namespace spectrum_ns {

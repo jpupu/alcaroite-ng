@@ -1,6 +1,6 @@
 (load "linalg.scm")
 
-(define spectrum-samples 10)
+(define spectrum-samples 16)
 
 (define (vec-list . vals)
   (cons vec-list vals))

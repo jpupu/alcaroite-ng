@@ -188,6 +188,9 @@ std::shared_ptr<Material> build_material(const ValueBlock &block)
   else if (type == "matte") {
     return std::make_shared<Matte>(block.get<Spectrum>("reflectance"));
   }
+  else if (type == "perfect-mirror") {
+    return std::make_shared<PerfectMirror>(block.get<Spectrum>("reflectance"));
+  }
   else {
     throw std::runtime_error("unknown material");
   }

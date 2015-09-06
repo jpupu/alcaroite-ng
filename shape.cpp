@@ -113,69 +113,6 @@ public:
   }
 };
 
-class DirectQuad : public Shape {
-public:
-  DirectQuad(vec3 v[4]) : v{v[0], v[1], v[2], v[3]} {}
-
-  vec3 v[4];
-
-  bool intersect(Ray& ray, bool is_originator, bool inside_originator) const
-  {
-    // An Efficient Ray-Quadrilateral Intersection Test
-    // Area Lagae, Philip Dutré
-
-    // Reject rays using the barycentric coordinates of
-    // the intersection point with respect to T.
-    vec3 e01 = v[1] - v[0];
-    vec3 e03 = v[3] - v[0];
-    vec3 p = cross(ray.direction, e03);
-    float det = dot(e01, p);
-    if (fabs(det) == 0) return false;
-
-    vec3 T = ray.origin - v[0];
-    float a = dot(T, p) / det;
-    if (a < 0 || a > 1) return false;
-
-    vec3 q = cross(T, e01);
-    float b = dot(ray.direction, q) / det;
-    if (b < 0 || b > 1) return false;
-
-    // Reject rays using the barycentric coordinates of
-    // the intersection point with respect to T'.
-    if ((a + b) > 1) {
-      vec3 e23 = v[3] - v[2];
-      vec3 e21 = v[1] - v[2];
-      vec3 p = cross(ray.direction, e21);
-      float det = dot(e23, p);
-      if (fabs(det) == 0) return false;
-
-      vec3 T = ray.origin - v[2];
-      float a = dot(T, p) / det;
-      if (a < 0 || a > 1) return false;
-
-      vec3 q = cross(T, e23);
-      float b = dot(ray.direction, q) / det;
-      if (b < 0 || b > 1) return false;
-    }
-
-    // Compute the ray parameter of the intersection point.
-    float t = dot(e03, q) / det;
-    if (t < 0.0f) return false;
-    if (t > ray.tmax) return false;
-
-    if (is_originator) {
-      if (inside_originator && ray.direction.y < 0) return false;
-      if (!inside_originator && ray.direction.y > 0) return false;
-    }
-
-    ray.tmax = t;
-    ray.position = ray.origin + ray.direction * t;
-    ray.normal = vec3(0, 1, 0);
-
-    return true;
-  }
-};
-
 class QuadMesh : public Shape {
 public:
   QuadMesh(std::vector<vec3> v, std::vector<int> f) : vertdata(v), facedata(f)
@@ -187,8 +124,12 @@ public:
 
   bool intersect(Ray& ray, bool is_originator, bool inside_originator) const
   {
-    float t = 0;
+    // An Efficient Ray-Quadrilateral Intersection Test
+    // Area Lagae, Philip Dutré
+
+    float tmax = ray.tmax;
     bool hit = false;
+    vec3 n;
 
     for (size_t i = 0; i < facedata.size() / 4; ++i) {
       vec3 v0 = vertdata[facedata[i * 4 + 0]];
@@ -231,23 +172,25 @@ public:
       }
 
       // Compute the ray parameter of the intersection point.
-      t = dot(e03, q) / det;
+      float t = dot(e03, q) / det;
       if (t < 0.0f) continue;
-      if (t > ray.tmax) continue;
+      if (t > tmax) continue;
 
       if (is_originator) {
         if (inside_originator && ray.direction.y < 0) continue;
         if (!inside_originator && ray.direction.y > 0) continue;
       }
 
+      n = cross(e01, e03);
+      tmax = t;
       hit = true;
     }
 
     if (!hit) return false;
 
-    ray.tmax = t;
-    ray.position = ray.origin + ray.direction * t;
-    ray.normal = vec3(0, 1, 0);
+    ray.tmax = tmax;
+    ray.position = ray.origin + ray.direction * tmax;
+    ray.normal = normalize(n);
 
     return true;
   }
@@ -262,16 +205,7 @@ std::shared_ptr<Shape> build_shape(const ValueBlock& block)
   else if (type == "plane") {
     return std::make_shared<Plane>();
   }
-  else if (type == "direct_quad") {
-    vec3 v[4] = {block.get<vec3>("v0"), block.get<vec3>("v1"),
-                 block.get<vec3>("v2"), block.get<vec3>("v3")};
-    return std::make_shared<DirectQuad>(v);
-  }
   else if (type == "quadmesh") {
-    // std::vector<vec3> v = {block.get<vec3>("v0"), block.get<vec3>("v1"),
-    //              block.get<vec3>("v2"), block.get<vec3>("v3"),
-    //              block.get<vec3>("v4"), block.get<vec3>("v5"),
-    //              block.get<vec3>("v6"), block.get<vec3>("v7")};
     return std::make_shared<QuadMesh>(block.get<std::vector<vec3>>("vertices"),
                                       block.get<std::vector<int>>("faces"));
   }

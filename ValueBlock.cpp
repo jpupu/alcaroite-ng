@@ -5,6 +5,54 @@
 ValueBlock::ValueBlock(std::string type, std::string id) : type(type), id(id) {}
 
 template <typename T>
+bool has_value(const std::string& name, const std::map<std::string, T>& map)
+{
+  return map.find(name) != map.end();
+}
+
+template <>
+bool ValueBlock::has<std::string>(const std::string& name) const
+{
+  return has_value(name, svalues);
+}
+
+template <>
+bool ValueBlock::has<double>(const std::string& name) const
+{
+  return has_value(name, nvalues);
+}
+
+template <>
+bool ValueBlock::has<pupumath::vec3>(const std::string& name) const
+{
+  return has_value(name, vvalues);
+}
+
+template <>
+bool ValueBlock::has<pupumath::mat34>(const std::string& name) const
+{
+  return has_value(name, mvalues);
+}
+
+template <>
+bool ValueBlock::has<Spectrum>(const std::string& name) const
+{
+  return has_value(name, spvalues);
+}
+
+template <>
+bool ValueBlock::has<std::vector<pupumath::vec3>>(const std::string& name) const
+{
+  return has_value(name, lvvalues);
+}
+
+template <>
+bool ValueBlock::has<std::vector<int>>(const std::string& name) const
+{
+  return has_value(name, livalues);
+}
+
+template <typename T>
 T get_value(const std::string& name, const std::map<std::string, T>& map,
             std::string type_name, std::string id)
 {

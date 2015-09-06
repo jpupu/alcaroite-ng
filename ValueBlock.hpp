@@ -24,6 +24,8 @@ struct ValueBlock {
   void read_value(std::istream& istream);
 
   template <typename T>
+  bool has(const std::string& name) const;
+  template <typename T>
   T get(const std::string& name) const;
   template <typename T>
   void set(const std::string& name, T value);

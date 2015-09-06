@@ -52,6 +52,37 @@ Scene build_scene(const std::vector<ValueBlock>& blocks)
   return scene;
 }
 
+void test_spectrum()
+{
+  using namespace spectrum_ns;
+  int cols = Spectrum::max + 1 - Spectrum::min;
+  Framebuffer framebuffer(cols, 100);
+  Spectrum reconstructed(vec3(0));
+
+  for (int x = 0; x < cols; x++) {
+    int wl = Spectrum::min + x;
+    vec3 xyz = spectrum_sample_to_xyz(wl, 1);
+    vec3 lrgb = xyz_to_linear_rgb(xyz);
+    for (int y = 0; y < 50; y++) {
+      framebuffer.add_sample(x, y, lrgb);
+    }
+    auto sample_reconstructed = linear_rgb_to_spectrum(lrgb);
+    for (int i = 0; i < Spectrum::count; i++) {
+      reconstructed.samples[i] += sample_reconstructed[i] / cols;
+    }
+  }
+
+  for (int x = 0; x < cols; x++) {
+    int wl = Spectrum::min + x;
+    vec3 xyz = spectrum_sample_to_xyz(wl, reconstructed.sample(wl));
+    vec3 lrgb = xyz_to_linear_rgb(xyz);
+    for (int y = 50; y < 100; y++) {
+      framebuffer.add_sample(x, y, lrgb);
+    }
+  }
+  framebuffer.save_ppm("test_spectrum.ppm");
+}
+
 int main(int argc, char* argv[])
 {
 
@@ -76,12 +107,18 @@ int main(int argc, char* argv[])
       "input", "Input file", "test.ascn", "???", "scene file", cmd);
   TCLAP::ValueArg<std::string> output_file_arg("o", "output", "Output file",
                                                false, "foo.ppm", "file", cmd);
+  TCLAP::SwitchArg test_spectrum_arg("", "test-spectrum", "Test spectrum", cmd);
   TCLAP::SwitchArg help_arg("", "help", "Show this help message", cmd);
 
   cmd.parse(argc, argv);
 
   if (help_arg.getValue()) {
     TCLAP::StdOutput().usage(cmd);
+    return 0;
+  }
+
+  if (test_spectrum_arg.getValue()) {
+    test_spectrum();
     return 0;
   }
 

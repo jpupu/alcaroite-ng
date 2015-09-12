@@ -1,8 +1,7 @@
 #pragma once
 
 class Ray;
-class Sampler;
+class Sample;
 struct Scene;
 
-float radiance(const Scene &scene, Ray &ray, float wavelen, Sampler &sampler,
-               int sample_index);
+float radiance(const Scene& scene, Ray& ray, float wavelen, Sample& sample);

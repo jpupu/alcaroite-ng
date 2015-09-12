@@ -92,8 +92,8 @@ public:
   size_t size() const { return list.size(); }
 };
 
-float radiance(const Scene& scene, Ray& ray, float wavelen, Sampler& sampler,
-               int sample_index, int nested, InteriorList& interior)
+float radiance(const Scene& scene, Ray& ray, float wavelen, Sample& sample,
+               int nested, InteriorList& interior)
 {
   if (nested > 100) return 0.0f;
   bool hit = false;
@@ -146,8 +146,12 @@ float radiance(const Scene& scene, Ray& ray, float wavelen, Sampler& sampler,
     float pdf;
     // float fr = brdf_lambertian(wo_t, wi_t, pdf, sample[0], sample[1]);
     // float fr = brdf_lambertian(wo_t, wi_t, pdf, frand(), frand());
+    vec2 u12 = sample.shading();
     float fr = ray.hit_object->mat->fr(
-        wo_t, wi_t, wavelen, outer_refractive_index, pdf, frand(), frand());
+        // wo_t, wi_t, wavelen, outer_refractive_index, pdf, frand(), frand());
+        // wo_t, wi_t, wavelen, outer_refractive_index, pdf,
+        // sampler.shading[sample_index].x, sampler.shading[sample_index].y);
+        wo_t, wi_t, wavelen, outer_refractive_index, pdf, u12[0], u12[1]);
     wi_w = mul(from_tangent, wi_t);
 
     factor = fr * abs_cos_theta(wi_t) / pdf;
@@ -164,15 +168,13 @@ float radiance(const Scene& scene, Ray& ray, float wavelen, Sampler& sampler,
   }
 
   Ray next_ray = {ray.position, wi_w, 1000.0, ray.hit_object};
-  float L = radiance(scene, next_ray, wavelen, sampler, sample_index,
-                     nested + 1, interior);
+  float L = radiance(scene, next_ray, wavelen, sample, nested + 1, interior);
 
   return factor * absorbtion * L + Le;
 }
 
-float radiance(const Scene& scene, Ray& ray, float wavelen, Sampler& sampler,
-               int sample_index)
+float radiance(const Scene& scene, Ray& ray, float wavelen, Sample& sample)
 {
   InteriorList interior;
-  return radiance(scene, ray, wavelen, sampler, sample_index, 0, interior);
+  return radiance(scene, ray, wavelen, sample, 0, interior);
 }

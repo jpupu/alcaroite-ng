@@ -1,9 +1,10 @@
 #include "sampler.hpp"
 #include "util.hpp"
 using pupumath::vec3;
+using pupumath::vec2;
 
 Sampler::Sampler(int n)
-    : n(n), wavelen(new float[n]), lens(new vec3[n]), shading(new vec3[n])
+    : n(n), wavelen(new float[n]), lens(new vec2[n]), shading(new vec2[n * 4])
 {
 }
 
@@ -18,21 +19,24 @@ void Sampler::generate()
 
   {
     for (int i = 0; i < n; i++) {
-      lens[i] = vec3{frand(), frand(), 0};
+      lens[i] = vec2{frand(), frand()};
     }
   }
 
   {
 
     const float step = 1.f / n;
-    for (int i = 0; i < n; i++) {
-      shading[i] = vec3{(i + frand()) * step, (i + frand()) * step, 0};
-      // shading[i] = vec3{ frand(), frand(), 0 };
+    for (int k = 0; k < 4; k++) {
+      for (int i = 0; i < n; i++) {
+        shading[k * n + i] = vec2{(i + frand()) * step, (i + frand()) * step};
+      }
     }
     // Shuffle u1 values -> latin hypercube.
-    for (int i = 0; i < n - 1; i++) {
-      int j = i + rand() % (n - i);
-      std::swap(shading[i].x, shading[j].x);
+    for (int k = 0; k < 4; k++) {
+      for (int i = 0; i < n - 1; i++) {
+        int j = i + rand() % (n - i);
+        std::swap(shading[k * n + i].x, shading[k * n + j].x);
+      }
     }
   }
 }
@@ -57,9 +61,41 @@ void Sampler::next()
 
   {
     // Shuffle samples.
-    for (int i = 0; i < n - 1; i++) {
-      int j = i + rand() % (n - i);
-      std::swap(shading[i], shading[j]);
+    for (int k = 0; k < 4; k++) {
+      for (int i = 0; i < n - 1; i++) {
+        int j = i + rand() % (n - i);
+        std::swap(shading[k * n + i], shading[k * n + j]);
+      }
     }
   }
+}
+
+class RandomSampler : public Sampler {
+public:
+  RandomSampler(int n) : Sampler(n) {}
+
+  void get_shading(int index, float& u1, float& u2)
+  {
+    u1 = frand();
+    u2 = frand();
+  }
+};
+
+class CleverSampler : public Sampler {
+public:
+  CleverSampler(int n) : Sampler(n) {}
+
+  void get_shading(int index, float& u1, float& u2)
+  {
+    u1 = shading[index].x;
+    u2 = shading[index].y;
+  }
+};
+
+std::shared_ptr<Sampler> create_sampler(int n, const std::string& name)
+{
+  if (name == "random")
+    return std::make_shared<RandomSampler>(n);
+  else
+    return std::make_shared<CleverSampler>(n);
 }

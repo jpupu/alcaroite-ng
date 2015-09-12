@@ -22,8 +22,8 @@ public:
     film_dist = 1.0 / tan(a);
   }
 
-  CameraSample project(const vec3& film_sample, float wavelen,
-                       const vec3& lens_sample) const override
+  CameraSample project(const vec2& film_sample, float wavelen,
+                       const vec2& lens_sample) const override
   {
     auto dir = vec3{film_sample.x, film_sample.y, -film_dist};
     return {origin, transform_normal(cam_to_world, normalize(dir))};

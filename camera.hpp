@@ -15,8 +15,8 @@ public:
 
   Camera(pupumath::Transform cam_to_world);
 
-  virtual CameraSample project(const pupumath::vec3& film_sample, float wavelen,
-                               const pupumath::vec3& lens_sample) const = 0;
+  virtual CameraSample project(const pupumath::vec2& film_sample, float wavelen,
+                               const pupumath::vec2& lens_sample) const = 0;
 };
 
 std::shared_ptr<Camera> build_camera(const ValueBlock& block);

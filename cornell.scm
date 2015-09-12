@@ -69,7 +69,7 @@
                          .2130 .5488 .2270
                          )
             "faces" (int-list 0 1 2 3   7 6 5 4))
-  "material" white
+  "material" light
   "priority" 10
   "transform" (identity))
 

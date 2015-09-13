@@ -26,7 +26,7 @@ public:
                        const vec2& lens_sample) const override
   {
     auto dir = vec3{film_sample.x, film_sample.y, -film_dist};
-    return {origin, transform_normal(cam_to_world, normalize(dir))};
+    return {origin, transform_vector(cam_to_world, normalize(dir))};
   }
 };
 } // camera_ns

@@ -1,4 +1,6 @@
 
+(define pi 3.14159265358979)
+
 (define (vec-op op v a)
   (if (null? v) '()
     (if (list? a)
@@ -166,6 +168,7 @@
 (define (rotate-x degrees)
   (let* ((radians (* (/ degrees 180.0) pi))
          (s (sin radians))
+         (-s (- 0 s))
          (c (cos radians)))
     (matrix
       1   0   0   0
@@ -176,6 +179,7 @@
 (define (rotate-y degrees)
   (let* ((radians (* (/ degrees 180.0) pi))
          (s (sin radians))
+         (-s (- 0 s))
          (c (cos radians)))
     (matrix
       c   0   s   0
@@ -186,6 +190,7 @@
 (define (rotate-z degrees)
   (let* ((radians (* (/ degrees 180.0) pi))
          (s (sin radians))
+         (-s (- 0 s))
          (c (cos radians)))
     (matrix
       c  -s   0   0

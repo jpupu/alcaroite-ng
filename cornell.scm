@@ -1,7 +1,7 @@
 (load "alcaroite.scm")
 
 
-(define white
+(define cornell-white
   (material "matte" "reflectance" (spectrum-linear
     0.343 0.445 0.551 0.624 0.665 0.687 0.708 0.723 0.715 0.710 0.745
     0.758 0.739 0.767 0.777 0.765 0.751 0.745 0.748 0.729 0.745 0.757
@@ -12,7 +12,7 @@
     0.703 0.729 0.750 0.760 0.751 0.739 0.724 0.730 0.740 0.737
     )))
 
-(define green
+(define cornell-green
   (material "matte" "reflectance" (spectrum-linear
     0.092 0.096 0.098 0.097 0.098 0.095 0.095 0.097 0.095 0.094 0.097
     0.098 0.096 0.101 0.103 0.104 0.107 0.109 0.112 0.115 0.125 0.140
@@ -23,7 +23,7 @@
     0.122 0.128 0.132 0.139 0.144 0.146 0.150 0.152 0.157 0.159
     )))
 
-(define red
+(define cornell-red
   (material "matte" "reflectance" (spectrum-linear
     0.040 0.046 0.048 0.053 0.049 0.050 0.053 0.055 0.057 0.056 0.059
     0.057 0.061 0.061 0.060 0.062 0.062 0.062 0.061 0.062 0.060 0.059
@@ -34,7 +34,7 @@
     0.627 0.620 0.630 0.628 0.642 0.639 0.657 0.639 0.635 0.642
     )))
 
-(define light
+(define cornell-light
   (material "matte"
     "reflectance" (spectrum .78)
     "emittance" (spectrum-linear 0.0 8.0 15.6 18.4)))
@@ -42,164 +42,201 @@
 (define mirror
   (material "perfect-mirror" "reflectance" (spectrum 1)))
 
-;; Floor
-(object
-  "shape" (shape "quadmesh"
-            "vertices" (vec-list
-                         .5528  0 0
-                         0      0 0
-                         0      0 .5592
-                         .5496  0 .5592)
-            "faces" (int-list 0 1 2 3))
-  "material" white
-  "priority" 10
-  "transform" (identity))
 
-;; Ceiling
-(object
-  "shape" (shape "quadmesh"
-            "vertices" (vec-list
-                         .5560 .5488 .0000
-                         .5560 .5488 .5592
-                         .0000 .5488 .5592
-                         .0000 .5488 .0000
-                         .3430 .5488 .2270
-                         .3430 .5488 .3320
-                         .2130 .5488 .3320
-                         .2130 .5488 .2270
-                         )
-            "faces" (int-list 0 1 2 3   7 6 5 4))
-  "material" light
-  "priority" 10
-  "transform" (identity))
-
-;; Light
-(object
-  "shape" (shape "quadmesh"
-            "vertices" (vec-list
-                          0.343 0.5487 0.227
-                          0.343 0.5487 0.332
-                          0.213 0.5487 0.332
-                          0.213 0.5487 0.227
-                          )
-            "faces" (int-list 0 1 2 3))
-  "material" light
-  "priority" 10
-  "transform" (identity))
-
-;; Back wall
-(object
-  "shape" (shape "quadmesh"
-            "vertices" (vec-list
-                         .5496  0     .5592
-                         0      0     .5592
-                         0      .5488 .5592
-                         .5560  .5488 .5592)
-            "faces" (int-list 0 1 2 3))
-  "material" white
-  "priority" 10
-  "transform" (identity))
-
-;; Right wall
-(object
-  "shape" (shape "quadmesh"
-            "vertices" (vec-list
-                         0  0     .5592
-                         0  0     0
-                         0  .5488 0
-                         0  .5488 .5592)
-            "faces" (int-list 0 1 2 3))
-  "material" green
-  "priority" 10
-  "transform" (identity))
-
-;; Left wall
-(object
-  "shape" (shape "quadmesh"
-            "vertices" (vec-list
-                         .5528  0     0
-                         .5496  0     .5592
-                         .5560  .5488 .5592
-                         .5560  .5488 0)
-            "faces" (int-list 0 1 2 3))
-  "material" red
-  "priority" 10
-  "transform" (identity))
-
-;; Short block
-(object
-  "shape" (shape "quadmesh"
-            "vertices" (vec-list
-                          0.130 0.165 0.065
-                          0.082 0.165 0.225
-                          0.240 0.165 0.272
-                          0.290 0.165 0.114
-
-                          0.290 0.000 0.114
-                          0.290 0.165 0.114
-                          0.240 0.165 0.272
-                          0.240 0.000 0.272
-
-                          0.130 0.000 0.065
-                          0.130 0.165 0.065
-                          0.290 0.165 0.114
-                          0.290 0.000 0.114
-
-                          0.082 0.000 0.225
-                          0.082 0.165 0.225
-                          0.130 0.165 0.065
-                          0.130 0.000 0.065
-
-                          0.240 0.000 0.272
-                          0.240 0.165 0.272
-                          0.082 0.165 0.225
-                          0.082 0.000 0.225)
-            "faces" (int-list 0 1 2 3  4 5 6 7  8 9 10 11 12 13 14 15 16 17 18 19))
-  "material" white
-  "priority" 10
-  "transform" (identity))
-
-;; Tall block
-(object
-  "shape" (shape "quadmesh"
-            "vertices" (vec-list
-                          0.423 0.330 0.247
-                          0.265 0.330 0.296
-                          0.314 0.330 0.456
-                          0.472 0.330 0.406
-
-                          0.423 0.000 0.247
-                          0.423 0.330 0.247
-                          0.472 0.330 0.406
-                          0.472 0.000 0.406
-
-                          0.472 0.000 0.406
-                          0.472 0.330 0.406
-                          0.314 0.330 0.456
-                          0.314 0.000 0.456
-
-                          0.314 0.000 0.456
-                          0.314 0.330 0.456
-                          0.265 0.330 0.296
-                          0.265 0.000 0.296
-
-                          0.265 0.000 0.296
-                          0.265 0.330 0.296
-                          0.423 0.330 0.247
-                          0.423 0.000 0.247
-                          )
-            "faces" (int-list 0 1 2 3  4 5 6 7  8 9 10 11 12 13 14 15 16 17 18 19))
-  "material" white
-  "priority" 10
-  "transform" (identity))
-
-(skybox "solid"
-  "radiance" (spectrum 0.0))
+(define (cornell-floor . material)
+  (object
+    "shape" (shape "quadmesh"
+              "vertices" (vec-list
+                           .5528  0 0
+                           0      0 0
+                           0      0 .5592
+                           .5496  0 .5592)
+              "faces" (int-list 0 1 2 3))
+    "material" (if (null? material) cornell-white (car material))
+    "priority" 10
+    "transform" (identity)))
 
 
-(camera "pinhole"
-  "fov" 39.3076481
-  "transform" (look-at (vec .278 .273 -.800) (vec .278 .273 1) (vec 0 1 0)))
+(define (cornell-ceiling . material)
+  (object
+    "shape" (shape "quadmesh"
+              "vertices" (vec-list
+                           .5560 .5488 .0000
+                           .5560 .5488 .5592
+                           .0000 .5488 .5592
+                           .0000 .5488 .0000
+                           .3430 .5488 .2270
+                           .3430 .5488 .3320
+                           .2130 .5488 .3320
+                           .2130 .5488 .2270
+                           )
+              "faces" (int-list 0 1 2 3   7 6 5 4))
+    "material" (if (null? material) cornell-white (car material))
+    "priority" 10
+    "transform" (identity)))
 
-(finish)
+
+(define (cornell-light-mesh . material)
+  (object
+    "shape" (shape "quadmesh"
+              "vertices" (vec-list
+                            0.343 0.5487 0.227
+                            0.343 0.5487 0.332
+                            0.213 0.5487 0.332
+                            0.213 0.5487 0.227
+                            )
+              "faces" (int-list 0 1 2 3))
+    "material" (if (null? material) cornell-light (car material))
+    "priority" 10
+    "transform" (identity)))
+
+
+(define (cornell-back-wall . material)
+  (object
+    "shape" (shape "quadmesh"
+              "vertices" (vec-list
+                           .5496  0     .5592
+                           0      0     .5592
+                           0      .5488 .5592
+                           .5560  .5488 .5592)
+              "faces" (int-list 0 1 2 3))
+    "material" (if (null? material) cornell-white (car material))
+    "priority" 10
+    "transform" (identity)))
+
+
+(define (cornell-right-wall . material)
+  (object
+    "shape" (shape "quadmesh"
+              "vertices" (vec-list
+                           0  0     .5592
+                           0  0     0
+                           0  .5488 0
+                           0  .5488 .5592)
+              "faces" (int-list 0 1 2 3))
+    "material" (if (null? material) cornell-green (car material))
+    "priority" 10
+    "transform" (identity)))
+
+
+(define (cornell-left-wall . material)
+  (object
+    "shape" (shape "quadmesh"
+              "vertices" (vec-list
+                           .5528  0     0
+                           .5496  0     .5592
+                           .5560  .5488 .5592
+                           .5560  .5488 0)
+              "faces" (int-list 0 1 2 3))
+    "material" (if (null? material) cornell-red (car material))
+    "priority" 10
+    "transform" (identity)))
+
+(define (cornell-short-block . material)
+  (object
+    "shape" (shape "quadmesh"
+              "vertices" (vec-list
+                            0.130 0.165 0.065
+                            0.082 0.165 0.225
+                            0.240 0.165 0.272
+                            0.290 0.165 0.114
+
+                            0.290 0.000 0.114
+                            0.290 0.165 0.114
+                            0.240 0.165 0.272
+                            0.240 0.000 0.272
+
+                            0.130 0.000 0.065
+                            0.130 0.165 0.065
+                            0.290 0.165 0.114
+                            0.290 0.000 0.114
+
+                            0.082 0.000 0.225
+                            0.082 0.165 0.225
+                            0.130 0.165 0.065
+                            0.130 0.000 0.065
+
+                            0.240 0.000 0.272
+                            0.240 0.165 0.272
+                            0.082 0.165 0.225
+                            0.082 0.000 0.225)
+              "faces" (int-list
+                        0 1 2 3
+                        4 5 6 7
+                        8 9 10 11
+                        12 13 14 15
+                        16 17 18 19))
+    "material" (if (null? material) cornell-white (car material))
+    "priority" 10
+    "transform" (identity)))
+
+
+(define (cornell-tall-block . material)
+  (object
+    "shape" (shape "quadmesh"
+              "vertices" (vec-list
+                            0.423 0.330 0.247
+                            0.265 0.330 0.296
+                            0.314 0.330 0.456
+                            0.472 0.330 0.406
+
+                            0.423 0.000 0.247
+                            0.423 0.330 0.247
+                            0.472 0.330 0.406
+                            0.472 0.000 0.406
+
+                            0.472 0.000 0.406
+                            0.472 0.330 0.406
+                            0.314 0.330 0.456
+                            0.314 0.000 0.456
+
+                            0.314 0.000 0.456
+                            0.314 0.330 0.456
+                            0.265 0.330 0.296
+                            0.265 0.000 0.296
+
+                            0.265 0.000 0.296
+                            0.265 0.330 0.296
+                            0.423 0.330 0.247
+                            0.423 0.000 0.247
+                            )
+              "faces" (int-list
+                        0 1 2 3
+                        4 5 6 7
+                        8 9 10 11
+                        12 13 14 15
+                        16 17 18 19))
+    "material" (if (null? material) cornell-white (car material))
+    "priority" 10
+    "transform" (identity)))
+
+(define (cornell-skybox)
+  (skybox "solid"
+    "radiance" (spectrum 0.0)))
+
+
+(define (cornell-camera)
+  (camera "pinhole"
+    "fov" 39.3076481
+    "transform" (look-at
+                  (vec .278 .273 -.800)
+                  (vec .278 .273 1)
+                  (vec 0 1 0))))
+
+
+(define (cornell-box-empty)
+  (cornell-skybox)
+  (cornell-camera)
+  (cornell-ceiling)
+  (cornell-light-mesh)
+  (cornell-floor)
+  (cornell-back-wall)
+  (cornell-left-wall)
+  (cornell-right-wall))
+
+(define (cornell-box)
+  (cornell-box-empty)
+  (cornell-short-block)
+  (cornell-tall-block))
+
 

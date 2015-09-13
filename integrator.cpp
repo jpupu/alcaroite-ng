@@ -1,3 +1,4 @@
+#include "debug.hpp"
 #include "integrator.hpp"
 #include "material.hpp"
 #include "pupumath.hpp"
@@ -96,6 +97,10 @@ float radiance(const Scene& scene, Ray& ray, float wavelen, Sample& sample,
                int nested, InteriorList& interior)
 {
   if (nested > 100) return 0.0f;
+
+  DebugNester debugnester;
+  debug.log(ray);
+
   bool hit = false;
   for (const auto& o : scene.objects) {
     Ray oray = {inverse_transform_point(o.xform, ray.origin),
@@ -110,19 +115,27 @@ float radiance(const Scene& scene, Ray& ray, float wavelen, Sample& sample,
     }
   }
   if (!hit) {
+    debug.miss();
     return scene.skybox->sample(ray.direction, wavelen);
   }
 
+  debug.hit(ray);
+
   float absorbtion = 1.0;
   if (interior.size() > 0) {
+    debug.log("absorb");
     absorbtion = interior.top()->mat->absorb(ray.tmax, wavelen);
   }
 
   if (dot(ray.direction, ray.normal) < 0) {
+    debug.log("⎆ enter object");
     interior.add(ray.hit_object);
   }
 
   bool true_intersection = (ray.hit_object == interior.top());
+
+  if (true_intersection) debug.log("♐ true intersection");
+  else debug.log("☷ false intersection");
 
   vec3 wi_w;
   float factor;
@@ -154,6 +167,9 @@ float radiance(const Scene& scene, Ray& ray, float wavelen, Sample& sample,
         wo_t, wi_t, wavelen, outer_refractive_index, pdf, u12[0], u12[1]);
     wi_w = mul(from_tangent, wi_t);
 
+    debug.shading(wo_t, wi_t, true);
+    debug.shading(-ray.direction, wi_w, false);
+
     factor = fr * abs_cos_theta(wi_t) / pdf;
 
     Le = ray.hit_object->mat->emittance.sample(wavelen);
@@ -164,6 +180,7 @@ float radiance(const Scene& scene, Ray& ray, float wavelen, Sample& sample,
   }
 
   if (dot(wi_w, ray.normal) > 0) {
+    debug.log("⏎ exit object");
     interior.remove(ray.hit_object);
   }
 

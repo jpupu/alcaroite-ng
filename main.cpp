@@ -1,4 +1,5 @@
 #include "camera.hpp"
+#include "debug.hpp"
 #include "framebuffer.hpp"
 #include "integrator.hpp"
 #include "material.hpp"
@@ -151,6 +152,7 @@ int main(int argc, char* argv[])
 #endif
       sampler->generate();
       for (int s = 0; s < S; s++) {
+        debug.enabled = (x==100 && y==100 && s==0);
         auto sample = Sample(sampler.get(), s);
         float wavelen = sample.wavelen();
         CameraSample camsamp =

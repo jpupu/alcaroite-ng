@@ -108,8 +108,8 @@ int main(int argc, char* argv[])
       "input", "Input file", "test.ascn", "???", "scene file", cmd);
   TCLAP::ValueArg<std::string> output_file_arg("o", "output", "Output file",
                                                false, "foo.ppm", "file", cmd);
-  TCLAP::ValueArg<std::string> sampler_arg("", "sampler", "Sampler",
-                                               false, "random", "name", cmd);
+  TCLAP::ValueArg<std::string> sampler_arg("", "sampler", "Sampler", false,
+                                           "lhs", "libcrandom|lhs", cmd);
   TCLAP::SwitchArg test_spectrum_arg("", "test-spectrum", "Test spectrum", cmd);
   TCLAP::SwitchArg help_arg("", "help", "Show this help message", cmd);
 
@@ -137,9 +137,7 @@ int main(int argc, char* argv[])
   int S = samples_arg.getValue();
   printf("Rendering %dx%d with %d samples/pixel\n", W, H, S);
   Framebuffer framebuffer(W, H);
-  // Sampler sampler = Sampler(S);
   std::shared_ptr<Sampler> sampler = create_sampler(S, sampler_arg.getValue());
-  sampler->generate();
   auto start = std::chrono::system_clock::now();
 // #define SINGLE
 #ifdef SINGLE
@@ -152,16 +150,14 @@ int main(int argc, char* argv[])
     for (int x = 0; x < W; x++) {
 #endif
       sampler->generate();
-      sampler->next();
       for (int s = 0; s < S; s++) {
-        // float wavelen = frand() * 380 + 420;
-        float wavelen = sampler->wavelen[s]; // frand() * 380 + 420;
+        auto sample = Sample(sampler.get(), s);
+        float wavelen = sample.wavelen();
         CameraSample camsamp =
             scene.camera->project(vec2{(float(x + .5) / W * 2 - 1) * W / H,
                                        -(float(y + .5) / H * 2 - 1)},
-                                  wavelen, sampler->lens[s]);
+                                  wavelen, sample.lens());
         Ray ray = {camsamp.origin, camsamp.direction, 1000.0, nullptr};
-        Sample sample{sampler.get(), s, 0};
         float L = radiance(scene, ray, wavelen, sample);
 // printf("--> L=%f\n", L);
 #ifdef SINGLE

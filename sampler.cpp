@@ -1,29 +1,48 @@
 #include "sampler.hpp"
+#include "spectrum.hpp"
 #include "util.hpp"
 using pupumath::vec3;
 using pupumath::vec2;
 
-Sampler::Sampler(int n)
-    : n(n), wavelen(new float[n]), lens(new vec2[n]), shading(new vec2[n * 4])
-{
-}
+struct LibCRandomSampler : public Sampler {
 
-void Sampler::generate()
-{
+  LibCRandomSampler(int n) : Sampler(n) {}
+
+  void generate() {}
+
+  float get_wavelen(int sample_id) override
   {
-    const float step = 340.f / n;
-    for (int i = 0; i < n; i++) {
-      wavelen[i] = 380.f + (i + frand()) * step;
-    }
+    return Spectrum::wavelen(frand());
   }
 
+  vec2 get_lens(int sample_id) override { return vec2{frand(), frand()}; }
+
+  vec2 get_shading(int sample_id, int counter) override
   {
+    return vec2{frand(), frand()};
+  }
+};
+
+struct LhsSampler : public Sampler {
+  std::unique_ptr<float[]> wavelen;
+  std::unique_ptr<pupumath::vec2[]> lens;
+  std::unique_ptr<pupumath::vec2[]> shading;
+
+  LhsSampler(int n)
+      : Sampler(n), wavelen(new float[n]), lens(new vec2[n]),
+        shading(new vec2[n * 4])
+  {
+  }
+
+  void generate() override
+  {
+    for (int i = 0; i < n; i++) {
+      wavelen[i] = Spectrum::wavelen((i + frand()) / n);
+    }
+
     for (int i = 0; i < n; i++) {
       lens[i] = vec2{frand(), frand()};
     }
-  }
-
-  {
 
     const float step = 1.f / n;
     for (int k = 0; k < 4; k++) {
@@ -38,29 +57,20 @@ void Sampler::generate()
         std::swap(shading[k * n + i].x, shading[k * n + j].x);
       }
     }
-  }
-}
 
-void Sampler::next()
-{
-  {
-    // Shuffle.
+
+    // Shuffle samples so the different dimensions are not dependent.
+
     for (int i = 0; i < n - 1; i++) {
       int j = i + rand() % (n - i);
       std::swap(wavelen[i], wavelen[j]);
     }
-  }
 
-  {
-    // Shuffle.
     for (int i = 0; i < n - 1; i++) {
       int j = i + rand() % (n - i);
       std::swap(lens[i], lens[j]);
     }
-  }
 
-  {
-    // Shuffle samples.
     for (int k = 0; k < 4; k++) {
       for (int i = 0; i < n - 1; i++) {
         int j = i + rand() % (n - i);
@@ -68,34 +78,26 @@ void Sampler::next()
       }
     }
   }
-}
 
-class RandomSampler : public Sampler {
-public:
-  RandomSampler(int n) : Sampler(n) {}
+  float get_wavelen(int sample_id) override { return wavelen[sample_id]; }
 
-  void get_shading(int index, float& u1, float& u2)
+  vec2 get_lens(int sample_id) override { return lens[sample_id]; }
+
+  vec2 get_shading(int sample_id, int counter) override
   {
-    u1 = frand();
-    u2 = frand();
-  }
-};
-
-class CleverSampler : public Sampler {
-public:
-  CleverSampler(int n) : Sampler(n) {}
-
-  void get_shading(int index, float& u1, float& u2)
-  {
-    u1 = shading[index].x;
-    u2 = shading[index].y;
+    if (counter < 4) {
+      return shading[counter * n + sample_id];
+    }
+    return vec2{frand(), frand()};
   }
 };
 
 std::shared_ptr<Sampler> create_sampler(int n, const std::string& name)
 {
-  if (name == "random")
-    return std::make_shared<RandomSampler>(n);
+  if (name == "libcrandom")
+    return std::make_shared<LibCRandomSampler>(n);
+  else if (name == "lhs")
+    return std::make_shared<LhsSampler>(n);
   else
-    return std::make_shared<CleverSampler>(n);
+    throw std::runtime_error("unknown sampler '" + name + "'");
 }

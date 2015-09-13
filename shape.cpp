@@ -1,4 +1,5 @@
 #include "shape.hpp"
+#include "debug.hpp"
 #include "pupumath.hpp"
 #include "ray.hpp"
 #include "ValueBlock.hpp"
@@ -176,12 +177,14 @@ public:
       if (t < 0.0f) continue;
       if (t > tmax) continue;
 
+      n = cross(e01, e03);
+
       if (is_originator) {
-        if (inside_originator && ray.direction.y < 0) continue;
-        if (!inside_originator && ray.direction.y > 0) continue;
+        bool inbound = (dot(ray.direction, n) < 0);
+        if (inside_originator && inbound) continue;
+        if (!inside_originator && !inbound) continue;
       }
 
-      n = cross(e01, e03);
       tmax = t;
       hit = true;
     }

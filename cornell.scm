@@ -34,16 +34,13 @@
     0.627 0.620 0.630 0.628 0.642 0.639 0.657 0.639 0.635 0.642
     )))
 
-(define cornell-light
+(define true-cornell-light
   (material "matte"
     "reflectance" (spectrum .78)
     "emittance" (spectrum-linear 0.0 8.0 15.6 18.4)))
 
-(define mirror
-  (material "perfect-mirror" "reflectance" (spectrum 1)))
 
-
-(define (cornell-floor . material)
+(define (true-cornell-floor . material)
   (object
     "shape" (shape "quadmesh"
               "vertices" (vec-list
@@ -57,7 +54,7 @@
     "transform" (identity)))
 
 
-(define (cornell-ceiling . material)
+(define (true-cornell-ceiling . material)
   (object
     "shape" (shape "quadmesh"
               "vertices" (vec-list
@@ -76,7 +73,7 @@
     "transform" (identity)))
 
 
-(define (cornell-light-mesh . material)
+(define (true-cornell-light-mesh . material)
   (object
     "shape" (shape "quadmesh"
               "vertices" (vec-list
@@ -86,12 +83,12 @@
                             0.213 0.5487 0.227
                             )
               "faces" (int-list 0 1 2 3))
-    "material" (if (null? material) cornell-light (car material))
+    "material" (if (null? material) true-cornell-light (car material))
     "priority" 10
     "transform" (identity)))
 
 
-(define (cornell-back-wall . material)
+(define (true-cornell-back-wall . material)
   (object
     "shape" (shape "quadmesh"
               "vertices" (vec-list
@@ -105,7 +102,7 @@
     "transform" (identity)))
 
 
-(define (cornell-right-wall . material)
+(define (true-cornell-right-wall . material)
   (object
     "shape" (shape "quadmesh"
               "vertices" (vec-list
@@ -119,7 +116,7 @@
     "transform" (identity)))
 
 
-(define (cornell-left-wall . material)
+(define (true-cornell-left-wall . material)
   (object
     "shape" (shape "quadmesh"
               "vertices" (vec-list
@@ -132,7 +129,7 @@
     "priority" 10
     "transform" (identity)))
 
-(define (cornell-short-block . material)
+(define (true-cornell-short-block . material)
   (object
     "shape" (shape "quadmesh"
               "vertices" (vec-list
@@ -171,7 +168,7 @@
     "transform" (identity)))
 
 
-(define (cornell-tall-block . material)
+(define (true-cornell-tall-block . material)
   (object
     "shape" (shape "quadmesh"
               "vertices" (vec-list
@@ -215,7 +212,7 @@
     "radiance" (spectrum 0.0)))
 
 
-(define (cornell-camera)
+(define (true-cornell-camera)
   (camera "pinhole"
     "fov" 39.3076481
     "transform" (look-at
@@ -224,19 +221,133 @@
                   (vec 0 1 0))))
 
 
-(define (cornell-box-empty)
+(define (true-cornell-box-empty)
   (cornell-skybox)
-  (cornell-camera)
-  (cornell-ceiling)
-  (cornell-light-mesh)
-  (cornell-floor)
-  (cornell-back-wall)
-  (cornell-left-wall)
-  (cornell-right-wall))
+  (true-cornell-camera)
+  (true-cornell-ceiling)
+  (true-cornell-light-mesh)
+  (true-cornell-floor)
+  (true-cornell-back-wall)
+  (true-cornell-left-wall)
+  (true-cornell-right-wall))
+
+(define (true-cornell-box)
+  (true-cornell-box-empty)
+  (true-cornell-short-block)
+  (true-cornell-tall-block))
+
+(define (true-cornell-box-empty-bright)
+  (cornell-skybox)
+  (true-cornell-camera)
+  (true-cornell-ceiling true-cornell-light)
+  (true-cornell-light-mesh)
+  (true-cornell-floor)
+  (true-cornell-back-wall)
+  (true-cornell-left-wall)
+  (true-cornell-right-wall))
+
+(define (true-cornell-box-bright)
+  (true-cornell-box-empty-bright)
+  (true-cornell-short-block)
+  (true-cornell-tall-block))
+
+
+(define cornell-light
+  (material "matte"
+    "reflectance" (spectrum .78)
+    "emittance" (spectrum-linear 12.0)))
+
+(define cornell-helper-quad
+  (shape "quadmesh"
+    "vertices" (vec-list
+                 -1  1 -1
+                 -1 -1 -1
+                  1 -1 -1
+                  1  1 -1)
+    "faces" (int-list 0 1 2 3)))
+
+(define (cornell-back-wall . material)
+  (object
+    "shape" cornell-helper-quad
+    "material" (if (null? material) cornell-white (car material))
+    "priority" 10
+    "transform" (identity)))
+
+(define (cornell-left-wall . material)
+  (object
+    "shape" cornell-helper-quad
+    "material" (if (null? material) cornell-red (car material))
+    "priority" 10
+    "transform" (rotate-y 90)))
+
+(define (cornell-right-wall . material)
+  (object
+    "shape" cornell-helper-quad
+    "material" (if (null? material) cornell-green (car material))
+    "priority" 10
+    "transform" (rotate-y -90)))
+
+(define (cornell-floor . material)
+  (object
+    "shape" cornell-helper-quad
+    "material" (if (null? material) cornell-white (car material))
+    "priority" 10
+    "transform" (rotate-x -90)))
+
+(define (cornell-floor2 . material)
+  (object
+    "shape" cornell-helper-quad2
+    "material" (if (null? material) cornell-white (car material))
+    "priority" 10
+    "transform" (identity)))
+
+(define (cornell-ceiling . material)
+  (object
+    "shape" cornell-helper-quad
+    "material" (if (null? material) cornell-white (car material))
+    "priority" 10
+    "transform" (rotate-x 90)))
+
+(define (cornell-light-mesh . material)
+  (object
+    "shape" (shape "quadmesh"
+              "vertices" (vec-list
+                           -.24 .99 -.19
+                            .24 .99 -.19
+                            .24 .99  .19
+                           -.24 .99  .19)
+              "faces" (int-list 0 1 2 3))
+    "material" (if (null? material) cornell-light (car material))
+    "priority" 10
+    "transform" (identity)))
+
+(define (cornell-camera)
+  (camera "pinhole"
+    "fov" 39.3076481
+    "transform" (look-at
+                  (vec 0 0 3.86)
+                  (vec 0 0 -1)
+                  (vec 0 1 0))))
 
 (define (cornell-box)
-  (cornell-box-empty)
-  (cornell-short-block)
-  (cornell-tall-block))
+  (cornell-skybox)
+  (cornell-camera)
+  (cornell-back-wall)
+  (cornell-left-wall)
+  (cornell-right-wall)
+  (cornell-floor)
+  (cornell-ceiling)
+  (cornell-light-mesh)
+)
 
+(define (cornell-box-bright)
+  (cornell-skybox)
+  (cornell-camera)
+  (cornell-back-wall)
+  (cornell-left-wall)
+  (cornell-right-wall)
+  (cornell-floor)
+  (cornell-ceiling cornell-light)
+  (cornell-light-mesh)
+)
 

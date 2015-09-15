@@ -1,5 +1,6 @@
 (load "cornell.scm")
 
-(cornell-box)
+(cornell-box-bright)
+
 (finish)
 

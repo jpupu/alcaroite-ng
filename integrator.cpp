@@ -99,7 +99,7 @@ float radiance(const Scene& scene, Ray& ray, float wavelen, Sample& sample,
   if (nested > 100) return 0.0f;
 
   DebugNester debugnester;
-  debug.log(ray);
+  debug.ray(ray);
 
   bool hit = false;
   for (const auto& o : scene.objects) {
@@ -134,8 +134,12 @@ float radiance(const Scene& scene, Ray& ray, float wavelen, Sample& sample,
 
   bool true_intersection = (ray.hit_object == interior.top());
 
-  if (true_intersection) debug.log("♐ true intersection");
-  else debug.log("☷ false intersection");
+  if (true_intersection) {
+    debug.log("♐ true intersection");
+  }
+  else {
+    debug.log("☷ false intersection");
+  }
 
   vec3 wi_w;
   float factor;
@@ -184,10 +188,15 @@ float radiance(const Scene& scene, Ray& ray, float wavelen, Sample& sample,
     interior.remove(ray.hit_object);
   }
 
+  if(factor*absorbtion > .01) {
   Ray next_ray = {ray.position, wi_w, 1000.0, ray.hit_object};
   float L = radiance(scene, next_ray, wavelen, sample, nested + 1, interior);
 
   return factor * absorbtion * L + Le;
+  }
+  else {
+    return Le;
+  }
 }
 
 float radiance(const Scene& scene, Ray& ray, float wavelen, Sample& sample)

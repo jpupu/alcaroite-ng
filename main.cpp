@@ -152,7 +152,8 @@ int main(int argc, char* argv[])
 #endif
       sampler->generate();
       for (int s = 0; s < S; s++) {
-        debug.enabled = (x==100 && y==100 && s==0);
+        debug.begin_path();
+        debug.enabled = (x == 100 && y == 100 && s == 0);
         auto sample = Sample(sampler.get(), s);
         float wavelen = sample.wavelen();
         CameraSample camsamp =
@@ -165,6 +166,7 @@ int main(int argc, char* argv[])
 #ifdef SINGLE
         L = 1000;
 #endif
+        debug.end_path();
         vec3 rgb = spectrum_ns::xyz_to_linear_rgb(
             spectrum_ns::spectrum_sample_to_xyz(wavelen, L));
         framebuffer.add_sample(x, y, rgb);
@@ -177,4 +179,14 @@ int main(int argc, char* argv[])
   std::chrono::duration<double> elapsed = end - start;
   printf("Rendered in %.1f seconds\n", elapsed.count());
   framebuffer.save_ppm(output_file_arg.getValue());
+
+  printf("Total paths: %d\n", debug.paths);
+  printf("Total rays: %d\n", debug.total_rays);
+  printf("Mean rays/path: %.1f\n", float(debug.total_rays) / debug.paths);
+  printf("Min rays/path: %d\n", debug.min_path_length);
+  printf("Max rays/path: %d\n", debug.max_path_length);
+  // for (int i = 0; i <= debug.max_path_length; ++i) {
+  //   printf("percentage of paths of length %d: %.1f\n", i,
+  //          100 * float(debug.path_lengths[i]) / debug.paths);
+  // }
 }
